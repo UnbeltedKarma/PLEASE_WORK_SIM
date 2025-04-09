@@ -1,3 +1,4 @@
+import pylab as p
 import streamlit as st
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,6 +7,8 @@ import numpy as np
 import random
 import plotly.graph_objects as go
 import math as Math
+
+from pyparsing import oneOf
 
 # Section 1:
 
@@ -19,10 +22,35 @@ st.write("By Brody Bennett - For Physical Science")
 st.sidebar.header("🔧 **Fundamental Constants**")
 st.sidebar.text("(Loosely Relative Values; 1 = Reality)")
 
-G = st.sidebar.slider("Gravitational Constant (G)", 0.1, 10.0, 1.0, step=0.1)
-alpha = st.sidebar.slider("Electromagnetic Force (α)", 0.01, 2.0, 1.0, step=0.01)
-strong_force = st.sidebar.slider("Strong Nuclear Force", 0.1, 10.0, 1.0, step=0.1)
-lambda_const = st.sidebar.slider("Cosmological Constant (Λ)", 0.0, 2.0, 1.0, step=0.01)
+
+# Function to reset values
+def reset_to_real_universe():
+    # This resets the session state values for all sliders
+    st.session_state.gravity = 1.0
+    st.session_state.em_force = 1.0
+    st.session_state.strong = 1.0
+    st.session_state.lambda_val = 1.0
+
+
+# Add the reset button to the sidebar
+st.sidebar.button("🔄 Reset to Real Universe", on_click=reset_to_real_universe)
+
+# Initialize session state for slider values if they don't exist
+if 'gravity' not in st.session_state:
+    st.session_state.gravity = 1.0
+if 'em_force' not in st.session_state:
+    st.session_state.em_force = 1.0
+if 'strong' not in st.session_state:
+    st.session_state.strong = 1.0
+if 'lambda_val' not in st.session_state:
+    st.session_state.lambda_val = 1.0
+
+# Updated sliders that use session_state
+G = st.sidebar.slider("Gravitational Constant (G)", 0.1, 10.0, st.session_state.gravity, key="gravity", step=0.1)
+alpha = st.sidebar.slider("Electromagnetic Force (α)", 0.01, 2.0, st.session_state.em_force, key="em_force", step=0.01)
+strong_force = st.sidebar.slider("Strong Nuclear Force", 0.1, 10.0, st.session_state.strong, key="strong", step=0.1)
+lambda_const = st.sidebar.slider("Cosmological Constant (Λ)", 0.0, 2.0, st.session_state.lambda_val, key="lambda_val",
+                                 step=0.01)
 
 st.markdown("---")
 st.header("📏 Real-World Physical Constants")
@@ -352,173 +380,344 @@ p5_html = f"""
     const LAMBDA_VALUE = {lambda_const};
 
     class Particle {{
-      constructor(x, y) {{
-        this.pos = p.createVector(x || p.random(0, p.width), y || p.random(0, p.height));
-        this.vel = p.createVector(p.random(-0.5, 0.5), p.random(-0.5, 0.5));
-        this.acc = p.createVector(0, 0);
-        this.mass = p.random(0.5, 1.5);
-        this.size = this.mass * 4;
-        this.color = p.color(255, 255, 255);
-        this.type = "matter";
-        this.lifespan = 1000;
-        this.stable = true;
-        this.energy = p.random(0, 10);
-      }}
-
-      applyForce(force) {{
-        // F = ma, so a = F/m
-        let f = p5.Vector.div(force, this.mass);
-        this.acc.add(f);
-      }}
-
-      gravitationalAttraction(other) {{
-        // Calculate direction of force
-        let force = p5.Vector.sub(other.pos, this.pos);
-        let distance = force.mag();
-
-        // Minimum distance to prevent extreme forces
-        distance = p.constrain(distance, 10, 1000);
-
-        // Normalize to get direction
-        force.normalize();
-
-        // Calculate gravitational force
-        let strength = (G_VALUE * this.mass * other.mass) / (distance * distance);
-        force.mult(strength);
-
-        return force;
-      }}
-
-      expansionForce() {{
-        // Direction from center
-        let center = p.createVector(p.width/2, p.height/2);
-        let force = p5.Vector.sub(this.pos, center);
-
-        if (force.mag() < 1) return p.createVector(0, 0);
-
-        force.normalize();
-
-        // Expansion grows with universe age and is affected by Lambda
-        let strength = LAMBDA_VALUE * 0.02 * (1 + universeAge / 1000);
-        force.mult(strength);
-
-        return force;
-      }}
-
-      update() {{
-        // Update position with velocity and acceleration
-        this.vel.add(this.acc);
-        this.vel.limit(5); // Terminal velocity
-        this.pos.add(this.vel);
-        this.acc.mult(0); // Reset acceleration
-
-        // Universe age affects particle behavior
-        this.lifespan--;
-
-        // Strong and alpha forces affect stability
-        if (STRONG_FORCE < 0.3 || ALPHA_VALUE < 0.05) {{
-          this.stable = false;
-          this.color = p.color(255, 0, 0);  // Unstable - red
-          if (p.random(1) < 0.01) this.disintegrate();
+          constructor(x, y) {{
+            this.pos = p.createVector(x || p.random(0, p.width), y || p.random(0, p.height));
+            this.vel = p.createVector(p.random(-0.5, 0.5), p.random(-0.5, 0.5));
+            this.acc = p.createVector(0, 0);
+            this.mass = p.random(0.5, 1.5);
+            this.size = this.mass * 4;
+            this.color = p.color(255, 255, 255);
+            this.type = this.determineElementType();
+            this.lifespan = 1000;
+            this.stable = true;
+            this.energy = p.random(0, 10);
+            this.applyElementProperties();
+          }}
+        
+          determineElementType() {{
+            // Element distribution depends on conditions
+            // More heavy elements when strong force is higher
+            let random = p.random(1);
+            
+            if (STRONG_FORCE < 0.5) {{
+              // Mostly hydrogen in weak strong force universes
+              return random < 0.9 ? "hydrogen" : "helium";
+            }} else if (STRONG_FORCE > 2.0) {{
+              // More heavy elements with strong nuclear force
+              if (random < 0.5) return "hydrogen";
+              else if (random < 0.7) return "helium";
+              else if (random < 0.9) return "carbon";
+              else return "iron";
+            }} else {{
+              // Balanced universe like ours
+              if (random < 0.7) return "hydrogen";
+              else if (random < 0.9) return "helium";
+              else if (random < 0.97) return "carbon";
+              else return "iron";
+            }}
+          }}
+        
+          applyElementProperties() {{
+            // Different elements have different properties
+            switch(this.type) {{
+              case "hydrogen":
+                this.color = p.color(130, 170, 255); // Light blue
+                this.mass *= 0.8;
+                this.size = this.mass * 3;
+                this.fusionChance = 0.003 * STRONG_FORCE;
+                break;
+              case "helium":
+                this.color = p.color(200, 200, 255); // Pale blue
+                this.mass *= 1.2;
+                this.size = this.mass * 3.5;
+                this.fusionChance = 0.001 * STRONG_FORCE;
+                break;
+              case "carbon":
+                this.color = p.color(100, 220, 100); // Green
+                this.mass *= 1.8;
+                this.size = this.mass * 3.8;
+                this.fusionChance = 0.0005 * STRONG_FORCE;
+                break;
+              case "iron":
+                this.color = p.color(255, 150, 50); // Orange
+                this.mass *= 2.2;
+                this.size = this.mass * 4;
+                this.fusionChance = 0;  // Iron doesn't fuse in stars (end of stellar fusion)
+                break;
+            }}
+            
+            // Electromagnetic force affects stability
+            if (ALPHA_VALUE < 0.05) {{
+              this.stability = 0.1; // Very unstable
+            }} else if (ALPHA_VALUE > 1.5) {{
+              this.stability = 0.5; // Somewhat unstable
+            }} else {{
+              this.stability = 0.9; // Stable
+            }}
+          }}
+        
+          applyForce(force) {{
+            // F = ma, so a = F/m
+            let f = p5.Vector.div(force, this.mass);
+            this.acc.add(f);
+          }}
+        
+          gravitationalAttraction(other) {{
+            // Calculate direction of force
+            let force = p5.Vector.sub(other.pos, this.pos);
+            let distance = force.mag();
+        
+            // Minimum distance to prevent extreme forces
+            distance = p.constrain(distance, 10, 1000);
+        
+            // Normalize to get direction
+            force.normalize();
+        
+            // Calculate gravitational force
+            let strength = (G_VALUE * this.mass * other.mass) / (distance * distance);
+            force.mult(strength);
+        
+            return force;
+          }}
+        
+          expansionForce() {{
+            // Direction from center
+            let center = p.createVector(p.width/2, p.height/2);
+            let force = p5.Vector.sub(this.pos, center);
+        
+            if (force.mag() < 1) return p.createVector(0, 0);
+        
+            force.normalize();
+        
+            // Expansion grows with universe age and is affected by Lambda
+            let strength = LAMBDA_VALUE * 0.02 * (1 + universeAge / 1000);
+            force.mult(strength);
+        
+            return force;
+          }}
+        
+          update() {{
+            // Update position with velocity and acceleration
+            this.vel.add(this.acc);
+            this.vel.limit(5); // Terminal velocity
+            this.pos.add(this.vel);
+            this.acc.mult(0); // Reset acceleration
+        
+            // Universe age affects particle behavior
+            this.lifespan--;
+        
+            // Potential chemical bonding with nearby particles
+            this.attemptBonding();
+        
+            // Strong force and alpha force affect stability
+            if (STRONG_FORCE < 0.3 || ALPHA_VALUE < 0.05) {{
+              this.stable = false;
+              if (p.random(1) < 0.01) this.disintegrate();
+            }}
+            else if (STRONG_FORCE > 5 || ALPHA_VALUE > 1.5) {{
+              if (p.random(1) < this.fusionChance && stars.length < 15) this.formStar();
+            }}
+            else {{
+              if (p.random(1) < this.fusionChance * 0.3 && stars.length < 20) this.formStar();
+            }}
+        
+            // Boundary wrap
+            if (this.pos.x < 0) this.pos.x = p.width;
+            if (this.pos.x > p.width) this.pos.x = 0;
+            if (this.pos.y < 0) this.pos.y = p.height;
+            if (this.pos.y > p.height) this.pos.y = 0;
+          }}
+        
+          attemptBonding() {{
+            // Only attempt bonding for carbon and stable conditions
+            // This simulates carbon's ability to form chemical bonds (for life)
+            if (this.type === "carbon" && ALPHA_VALUE > 0.8 && ALPHA_VALUE < 1.2) {{
+              // Find nearby particles
+              for (let i = 0; i < particles.length; i++) {{
+                if (particles[i] !== this) {{
+                  let distance = p5.Vector.dist(this.pos, particles[i].pos);
+                  
+                  // Chemical bonding distance
+                  if (distance < 20) {{
+                    // Small chance to form molecules
+                    if (p.random(1) < 0.001) {{
+                      this.color = p.color(0, 255, 100); // Bright green for molecules
+                      particles[i].color = p.color(0, 255, 100);
+                      
+                      // Chemical bonds slightly attract
+                      let force = p5.Vector.sub(particles[i].pos, this.pos);
+                      force.setMag(0.05 * ALPHA_VALUE);
+                      this.applyForce(force);
+                    }}
+                  }}
+                }}
+              }}
+            }}
+          }}
+        
+          formStar() {{
+            if (G_VALUE > 0.3 && G_VALUE < 3.0) {{
+              // Hydrogen and helium fuse more easily to form stars
+              if (this.type === "hydrogen" || this.type === "helium") {{
+                stars.push(new Star(this.pos.x, this.pos.y, this.type));
+                this.lifespan = 0; // Consume the particle
+              }}
+            }}
+          }}
+        
+          disintegrate() {{
+            this.lifespan = 0;
+            // Add disintegration effect
+            for (let i = 0; i < 5; i++) {{
+              particles.push(new DisintegrationParticle(this.pos.x, this.pos.y));
+            }}
+          }}
+        
+          draw() {{
+            p.noStroke();
+            p.fill(this.color);
+            p.ellipse(this.pos.x, this.pos.y, this.size, this.size);
+            
+            // Show element type when hovering
+            if (p.dist(p.mouseX, p.mouseY, this.pos.x, this.pos.y) < this.size) {{
+              p.fill(255);
+              p.textSize(10);
+              p.text(this.type, this.pos.x + 10, this.pos.y);
+            }}
+          }}
+        
+          isDead() {{
+            return this.lifespan <= 0;
+          }}
         }}
-        else if (STRONG_FORCE > 5 || ALPHA_VALUE > 1.5) {{
-          this.color = p.color(255, 165, 0);  // Extreme - orange
-          if (p.random(1) < 0.005 && stars.length < 15) this.formStar();
-        }}
-        else {{
-          this.color = p.color(0, 255, 255);  // Stable - cyan
-          if (p.random(1) < 0.002 && stars.length < 20) this.formStar();
-        }}
+        
 
-        // Boundary wrap
-        if (this.pos.x < 0) this.pos.x = p.width;
-        if (this.pos.x > p.width) this.pos.x = 0;
-        if (this.pos.y < 0) this.pos.y = p.height;
-        if (this.pos.y > p.height) this.pos.y = 0;
-      }}
-
-      formStar() {{
-        if (G_VALUE > 0.3 && G_VALUE < 3.0) {{
-          stars.push(new Star(this.pos.x, this.pos.y));
-          this.lifespan = 0; // Consume the particle
-        }}
-      }}
-
-      disintegrate() {{
-        this.lifespan = 0;
-        // Add disintegration effect
-        for (let i = 0; i < 5; i++) {{
-          particles.push(new DisintegrationParticle(this.pos.x, this.pos.y));
-        }}
-      }}
-
-      draw() {{
-        p.noStroke();
-        p.fill(this.color);
-        p.ellipse(this.pos.x, this.pos.y, this.size, this.size);
-      }}
-
-      isDead() {{
-        return this.lifespan <= 0;
-      }}
-    }}
 
     class Star {{
-      constructor(x, y) {{
-        this.pos = p.createVector(x, y);
-        this.mass = p.random(3, 8);
-        this.size = this.mass * 2;
-        this.lifespan = p.random(500, 2000);
-        this.color = p.color(255, 255, 100);
-        this.pulseRate = p.random(0.02, 0.05);
-        this.pulseAmount = 0;
-        starCount++;
-      }}
-
-      update() {{
-        // Star lifecycle based on G and strong force
-        this.lifespan -= (G_VALUE * STRONG_FORCE / 1.0);
-
-        // Pulsing effect
-        this.pulseAmount = p.sin(universeAge * this.pulseRate) * 2;
-
-        if (this.lifespan <= 100) {{
-          // Red giant phase
-          this.color = p.color(255, 50, 50);
+          constructor(x, y, sourceElement) {{
+            this.pos = p.createVector(x, y);
+            this.mass = p.random(3, 8);
+            this.size = this.mass * 2;
+            this.lifespan = p.random(500, 2000);
+            this.sourceElement = sourceElement || "hydrogen";
+            this.color = this.determineColor();
+            this.pulseRate = p.random(0.02, 0.05);
+            this.pulseAmount = 0;
+            
+            // Stars can produce elements
+            this.productionRate = 0.001 * STRONG_FORCE;
+            
+            starCount++;
+          }}
+          
+          determineColor() {{
+            // Star color based on source element
+            switch(this.sourceElement) {{
+              case "hydrogen":
+                return p.color(220, 220, 255); // White-blue
+              case "helium":
+                return p.color(255, 255, 180); // Yellow
+              case "carbon":
+                return p.color(255, 200, 150); // Orange
+              default:
+                return p.color(255, 255, 100); // Default yellow
+            }}
+          }}
+        
+          update() {{
+            // Star lifecycle based on G and strong force
+            this.lifespan -= (G_VALUE * STRONG_FORCE / 1.0);
+        
+            // Pulsing effect
+            this.pulseAmount = p.sin(universeAge * this.pulseRate) * 2;
+        
+            // Occasionally produce new elements through fusion
+            if (p.random(1) < this.productionRate && STRONG_FORCE > 0.5) {{
+              this.produceElement();
+            }}
+        
+            if (this.lifespan <= 100) {{
+              // Red giant phase
+              this.color = p.color(255, 50, 50);
+            }}
+          }}
+          
+          produceElement() {{
+            // Stars produce heavier elements through fusion
+            let newElement;
+            if (this.sourceElement === "hydrogen" && STRONG_FORCE > 0.5) {{
+              newElement = "helium";
+            }} else if (this.sourceElement === "helium" && STRONG_FORCE > 1.0) {{
+              newElement = p.random(1) < 0.7 ? "helium" : "carbon";
+            }} else if (this.sourceElement === "carbon" && STRONG_FORCE > 2.0) {{
+              newElement = p.random(1) < 0.8 ? "carbon" : "iron";
+            }} else {{
+              return; // No fusion possible
+            }}
+            
+            // Add new particle near the star
+            let offset = p5.Vector.random2D().mult(this.size * 1.5);
+            let newParticle = new Particle(this.pos.x + offset.x, this.pos.y + offset.y);
+            newParticle.type = newElement;
+            newParticle.applyElementProperties();
+            particles.push(newParticle);
+          }}
+        
+          draw() {{
+            // Glow effect
+            p.noStroke();
+            let glowSize = this.size + this.pulseAmount + 5;
+            p.fill(p.red(this.color), p.green(this.color), p.blue(this.color), 50);
+            p.ellipse(this.pos.x, this.pos.y, glowSize * 2, glowSize * 2);
+            p.fill(p.red(this.color), p.green(this.color), p.blue(this.color), 100);
+            p.ellipse(this.pos.x, this.pos.y, glowSize * 1.5, glowSize * 1.5);
+        
+            // Star body
+            p.fill(this.color);
+            p.ellipse(this.pos.x, this.pos.y, this.size + this.pulseAmount, this.size + this.pulseAmount);
+            
+            // Show star type when hovering
+            if (p.dist(p.mouseX, p.mouseY, this.pos.x, this.pos.y) < this.size) {{
+              p.fill(255);
+              p.textSize(12);
+              p.text(this.sourceElement + " star", this.pos.x + 15, this.pos.y);
+            }}
+          }}
+        
+          isDead() {{
+            return this.lifespan <= 0;
+          }}
+        
+          explode() {{
+            // Supernova - scatter heavy elements
+            for (let i = 0; i < 20; i++) {{
+              let newParticle;
+              
+              // Supernovae create heavier elements
+              if (STRONG_FORCE > 1.5) {{
+                let r = p.random(1);
+                let newType = r < 0.4 ? "hydrogen" : 
+                             r < 0.7 ? "helium" : 
+                             r < 0.9 ? "carbon" : "iron";
+                             
+                newParticle = new Particle(this.pos.x, this.pos.y);
+                newParticle.type = newType;
+                newParticle.applyElementProperties();
+                newParticle.vel = p5.Vector.random2D().mult(p.random(1, 3));
+                particles.push(newParticle);
+              }} else {{
+                particles.push(new DisintegrationParticle(this.pos.x, this.pos.y));
+              }}
+            }}
+        
+            // Small chance to form black hole
+            if (G_VALUE > 2.0 && p.random(1) < 0.3) {{
+              let blackHole = new BlackHole(this.pos.x, this.pos.y);
+              stars.push(blackHole);
+            }}
+          }}
         }}
-      }}
 
-      draw() {{
-        // Glow effect
-        p.noStroke();
-        let glowSize = this.size + this.pulseAmount + 5;
-        p.fill(p.red(this.color), p.green(this.color), p.blue(this.color), 50);
-        p.ellipse(this.pos.x, this.pos.y, glowSize * 2, glowSize * 2);
-        p.fill(p.red(this.color), p.green(this.color), p.blue(this.color), 100);
-        p.ellipse(this.pos.x, this.pos.y, glowSize * 1.5, glowSize * 1.5);
-
-        // Star body
-        p.fill(this.color);
-        p.ellipse(this.pos.x, this.pos.y, this.size + this.pulseAmount, this.size + this.pulseAmount);
-      }}
-
-      isDead() {{
-        return this.lifespan <= 0;
-      }}
-
-      explode() {{
-        // Supernova
-        for (let i = 0; i < 20; i++) {{
-          particles.push(new DisintegrationParticle(this.pos.x, this.pos.y));
-        }}
-
-        // Small chance to form black hole
-        if (G_VALUE > 2.0 && p.random(1) < 0.3) {{
-          let blackHole = new BlackHole(this.pos.x, this.pos.y);
-          stars.push(blackHole);
-        }}
-      }}
-    }}
 
     class BlackHole {{
       constructor(x, y) {{
@@ -603,60 +802,105 @@ p5_html = f"""
     }}
 
     function updateExplanation() {{
-      const explanationDiv = document.getElementById('explanation-overlay');
-      // Fix: store the result of determineUniverseState in a variable
-      const currentState = determineUniverseState();
-
-      let explanation = `<strong>Universe State: ${{currentState}}</strong><br><br>`;
-
-      if (G_VALUE < 0.3) {{
-        explanation += "Low gravity prevents matter from clumping to form stars.<br>";
-      }} else if (G_VALUE > 3.0) {{
-        explanation += "Extreme gravity causes rapid collapse of structures.<br>";
-      }}
-
-      if (LAMBDA_VALUE > 1.5) {{
-        explanation += "High cosmological constant causes universe to expand too quickly.<br>";
-      }}
-
-      if (STRONG_FORCE < 0.3) {{
-        explanation += "Weak nuclear force prevents stable atomic nuclei.<br>";
-      }} else if (STRONG_FORCE > 5.0) {{
-        explanation += "Strong nuclear force causes rapid fusion and unstable stars.<br>";
-      }}
-
-      if (ALPHA_VALUE < 0.05) {{
-        explanation += "Weak electromagnetic force prevents stable atoms.<br>";
-      }} else if (ALPHA_VALUE > 1.5) {{
-        explanation += "Strong electromagnetic force causes electron orbits to collapse.<br>";
-      }}
-
-      explanationDiv.innerHTML = explanation;
-    }}
+          const explanationDiv = document.getElementById('explanation-overlay');
+          const currentState = determineUniverseState();
+          
+          let explanation = `<strong>Universe State: ${{currentState}}</strong><br><br>`;
+          
+          if (G_VALUE < 0.3) {{
+            explanation += "Low gravity prevents matter from clumping to form stars.<br>";
+          }} else if (G_VALUE > 3.0) {{
+            explanation += "Extreme gravity causes rapid collapse of structures.<br>";
+          }}
+          
+          if (LAMBDA_VALUE > 1.5) {{
+            explanation += "High cosmological constant causes universe to expand too quickly.<br>";
+          }}
+          
+          if (STRONG_FORCE < 0.3) {{
+            explanation += "Weak nuclear force prevents stable atomic nuclei.<br>";
+          }} else if (STRONG_FORCE > 5.0) {{
+            explanation += "Strong nuclear force causes rapid fusion and unstable stars.<br>";
+          }}
+          
+          if (ALPHA_VALUE < 0.05) {{
+            explanation += "Weak electromagnetic force prevents stable atoms.<br>";
+          }} else if (ALPHA_VALUE > 1.5) {{
+            explanation += "Strong electromagnetic force causes electron orbits to collapse.<br>";
+          }}
+          
+          // Add life potential information
+          if (isLifePossible()) {{
+            explanation += "<strong style='color: #2ECC40;'>✓ Carbon-based life may be possible in this universe!</strong>";
+          }} else {{
+            explanation += "<strong style='color: #FF4136;'>✗ This universe cannot support life as we know it.</strong>";
+          }}
+          
+          explanationDiv.innerHTML = explanation;
+        }}
 
     function updateControls() {{
-      const controlsDiv = document.getElementById('controls-overlay');
-      // Fix: universeAge is accessible here because it's defined at the top of the p5 function
-      let content = `<strong>Universe Age:</strong> ${{Math.floor(universeAge)}}<br>`;
-      content += `<strong>Stars:</strong> ${{stars.length}}<br>`;
-      content += `<strong>Particles:</strong> ${{particles.length}}<br>`;
-      content += `<strong>Constants:</strong><br>`;
-      content += `G: ${{G_VALUE.toFixed(1)}} | α: ${{ALPHA_VALUE.toFixed(2)}} | Strong: ${{STRONG_FORCE.toFixed(1)}} | Λ: ${{LAMBDA_VALUE.toFixed(2)}}`;
+          const controlsDiv = document.getElementById('controls-overlay');
+          
+          // Count elements
+          let hydrogenCount = 0;
+          let heliumCount = 0;
+          let carbonCount = 0;
+          let ironCount = 0;
+          
+          for (let i = 0; i < particles.length; i++) {{
+            switch(particles[i].type) {{
+              case "hydrogen": hydrogenCount++; break;
+              case "helium": heliumCount++; break;
+              case "carbon": carbonCount++; break;
+              case "iron": ironCount++; break;
+            }}
+          }}
+          
+          let content = `<strong>Universe Age:</strong> ${{Math.floor(universeAge)}}<br>`;
+          content += `<strong>Stars:</strong> ${{stars.length}}<br>`;
+          content += `<strong>Elements:</strong><br>`;
+          content += `H: ${{hydrogenCount}} | He: ${{heliumCount}} | C: ${{carbonCount}} | Fe: ${{ironCount}}<br>`;
+          content += `<strong>Constants:</strong><br>`;
+          content += `G: ${{G_VALUE.toFixed(1)}} | α: ${{ALPHA_VALUE.toFixed(2)}} | Strong: ${{STRONG_FORCE.toFixed(1)}} | Λ: ${{LAMBDA_VALUE.toFixed(2)}}`;
+        
+          controlsDiv.innerHTML = content;
+        }}
 
-      controlsDiv.innerHTML = content;
-    }}
+    function isLifePossible() {{
+          // Life requires carbon, stable atomic structure, and moderate conditions
+          let carbonCount = 0;
+          let carbonMolecules = 0;
+          
+          for (let i = 0; i < particles.length; i++) {{
+            if (particles[i].type === "carbon") {{
+              carbonCount++;
+              if (p.red(particles[i].color) === 0 && p.green(particles[i].color) === 255) {{
+                carbonMolecules++;
+              }}
+            }}
+          }}
+          
+          // Life needs carbon, stars, stable atoms, and moderate conditions
+          return (carbonCount > 5 && 
+                  stars.length > 2 && 
+                  ALPHA_VALUE > 0.8 && ALPHA_VALUE < 1.2 &&
+                  G_VALUE > 0.8 && G_VALUE < 1.5 &&
+                  STRONG_FORCE > 0.8 && STRONG_FORCE < 2.0 &&
+                  carbonMolecules > 1);
+        }}
 
     p.setup = function() {{
       let canvas = p.createCanvas(700, 500);
       canvas.parent('canvas-container');
 
       // Initialize particles
-      for (let i = 0; i < 80; i++) {{
+      for (let i = 0; i < 150; i++) {{
         particles.push(new Particle());
       }}
 
       // Create initial central concentration for Big Bang
-      for (let i = 0; i < 20; i++) {{
+      for (let i = 0; i < 50; i++) {{
         let angle = p.random(0, p.TWO_PI);
         let radius = p.random(0, 50);
         let x = p.width/2 + p.cos(angle) * radius;
@@ -760,12 +1004,14 @@ st.markdown("""
 - **Universe Age**: Shows the progression of the simulated universe
 - **Universe State**: Dynamically explains if this universe could support life
 
-### Color Coding
-- **Cyan**: Stable atoms and chemistry (life-supporting)
-- **Red**: Unstable atoms, chemistry impossible
-- **Orange**: Extreme bonding, exotic chemistry
-- **Yellow**: Stars (nuclear fusion)
-- **Purple glow**: Black hole accretion disk
+### Color Coding by Element
+- 💧 **Hydrogen**: Light blue (💠)
+- 🎈 **Helium**: Pale blue (🔵)
+- 🌿 **Carbon**: Green (🟢)
+- ⚙️ **Iron**: Orange (🟠)
+- ☀️ **Stars**: Yellow-white to red, depending on their stage
+- 🌀 **Black Holes**: Black center with purple glow (accretion disk)
+- 🧬 **Bonded Carbon Molecules**: Bright green
 
 ### What's Happening
 This simulation shows how the fundamental constants affect the formation and behavior of matter in the universe. Try these combinations:
