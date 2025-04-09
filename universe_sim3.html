@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Star Lifecycle Physics Simulator</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #111;
+      color: white;
+    }
+    #universe-sim {
+      position: relative;
+      width: 700px;
+      height: 500px;
+      margin: 0 auto;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+    }
+    #controls-overlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 5px;
+      color: white;
+      font-family: monospace;
+      width: 250px;
+      transition: max-height 0.3s ease-out;
+      overflow: hidden;
+    }
+    #controls-overlay.collapsed {
+      max-height: 40px;
+    }
+    #controls-overlay.expanded {
+      max-height: 500px;
+    }
+    #collapse-btn {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      background: none;
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    #controls-content {
+      margin-top: 10px;
+    }
+    #explanation-overlay {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 5px;
+      color: white;
+      font-family: sans-serif;
+      max-width: 300px;
+      font-size: 12px;
+    }
+    .slider-container {
+      margin: 8px 0;
+    }
+    label {
+      display: inline-block;
+      width: 100px;
+      font-size: 12px;
+    }
+    input[type="range"] {
+      width: 100px;
+      vertical-align: middle;
+    }
+    .value-display {
+      display: inline-block;
+      width: 35px;
+      text-align: right;
+      font-size: 12px;
+    }
+    #constants-display {
+      border-top: 1px solid #555;
+      margin-top: 10px;
+      padding-top: 10px;
+      font-size: 12px;
+    }
+    .const-row {
+      margin: 3px 0;
+    }
+    .const-label {
+      display: inline-block;
+      width: 100px;
+    }
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      margin-bottom: 5px;
+      padding: 3px;
+    }
+    .section-header:hover {
+      background: rgba(255,255,255,0.1);
+    }
+    .section-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+    .section-content.expanded {
+      max-height: 200px; /* Adjust based on content */
+    }
+    .toggle-icon {
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="universe-sim">
+    <div id="canvas-container"></div>
+    <div id="controls-overlay" class="expanded">
+      <h3 style="margin-top: 0; font-size: 14px; display: inline-block;">Star Properties</h3>
+      <button id="collapse-btn">▲</button>
+
+      <div id="controls-content">
+        <div class="section-header" data-target="star-properties">
+          <span>Star Properties</span>
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div id="star-properties" class="section-content expanded">
+          <div class="slider-container">
+            <label for="temperature">Temperature (K):</label>
+            <input type="range" id="temperature" min="3000" max="40000" step="100" value="5778">
+            <span class="value-display" id="temp-value">5778</span>
+          </div>
+
+          <div class="slider-container">
+            <label for="star-mass">Star Mass (solar):</label>
+            <input type="range" id="star-mass" min="0.1" max="50" step="0.1" value="1.0">
+            <span class="value-display" id="mass-value">1.0</span>
+          </div>
+
+          <div class="slider-container">
+            <label for="sim-speed">Sim Speed:</label>
+            <input type="range" id="sim-speed" min="0.1" max="5" step="0.1" value="1.0">
+            <span class="value-display" id="speed-value">1.0</span>
+          </div>
+
+          <button id="reset-btn" style="margin-top: 5px;">Reset Simulation</button>
+        </div>
+
+        <div class="section-header" data-target="constants-display">
+          <span>Physics Constants</span>
+          <span class="toggle-icon">▼</span>
+        </div>
+        <div id="constants-display" class="section-content expanded">
+          <div class="const-row">
+            <span class="const-label">Star Age:</span>
+            <span id="age-display">0%</span>
+          </div>
+          <div class="const-row">
+            <span class="const-label">Gravity (G):</span>
+            <span id="g-display">{G}</span>
+          </div>
+          <div class="const-row">
+            <span class="const-label">EM Force:</span>
+            <span id="em-display">{alpha}</span>
+          </div>
+          <div class="const-row">
+            <span class="const-label">Strong Force:</span>
+            <span id="sf-display">{strong_force}</span>
+          </div>
+          <div class="const-row">
+            <span class="const-label">Cosmo Const (λ):</span>
+            <span id="cc-display">{lambda_const}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="explanation-overlay">
+      <h3 style="margin-top: 0; font-size: 14px;">Star Lifecycle Simulation</h3>
+      <div id="state-description">Young main sequence star emitting radiation and particles. Constants affect evolution.</div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+  <script>
+    // Set up collapsible sections
+    document.addEventListener('DOMContentLoaded', function() {
+      // Main collapse button
+      const collapseBtn = document.getElementById('collapse-btn');
+      const controlsOverlay = document.getElementById('controls-overlay');
+
+      collapseBtn.addEventListener('click', function() {
+        const isCollapsed = controlsOverlay.classList.contains('collapsed');
+        if (isCollapsed) {
+          controlsOverlay.classList.remove('collapsed');
+          controlsOverlay.classList.add('expanded');
+          collapseBtn.textContent = '▲';
+        } else {
+          controlsOverlay.classList.remove('expanded');
+          controlsOverlay.classList.add('collapsed');
+          collapseBtn.textContent = '▼';
+        }
+      });
+
+      // Section headers
+      const sectionHeaders = document.querySelectorAll('.section-header');
+      sectionHeaders.forEach(header => {
+        header.addEventListener('click', function() {
+          const targetId = this.getAttribute('data-target');
+          const targetSection = document.getElementById(targetId);
+          const isExpanded = targetSection.classList.contains('expanded');
+          const toggleIcon = this.querySelector('.toggle-icon');
+
+          if (isExpanded) {
+            targetSection.classList.remove('expanded');
+            toggleIcon.textContent = '►';
+          } else {
+            targetSection.classList.add('expanded');
+            toggleIcon.textContent = '▼';
+          }
+        });
+      });
+    });
+
+    new p5(function(p) {
+      // Canvas dimensions
+      const WIDTH = 700;
+      const HEIGHT = 500;
+
+      // Simulation variables
+      let star = {};
+      let particles = [];
+      let photons = [];
+      let starLifecycle = 0;   // 0-100%
+      let starState = "Main Sequence";
+      let lastEmissionTime = 0;
+      let blackHole = null;
+      let eventHorizonRadius = 0;
+      let accretionDisk = [];
+      let simulationSpeed = 1.0;
+      let paused = false;
+
+      // Constants from the python file that automatically get replaced by values
+      const G_VALUE = {G};
+      const ALPHA_VALUE = {alpha};
+      const STRONG_FORCE = {strong_force};
+      const LAMBDA_VALUE = {lambda_const};
+
+      // Star properties
+      let starMass = 1.0;          // In solar masses
+      let starTemperature = 5778;  // In Kelvin
+      let starRadius = 50;         // Visual radius in pixels
+      let particleCount = 0;
+
+      p.setup = function() {
+        let canvas = p.createCanvas(WIDTH, HEIGHT);
+        canvas.parent('canvas-container');
+        p.colorMode(p.HSB, 360, 100, 100, 1);
+        p.textAlign(p.CENTER, p.CENTER);
+
+        // Update the display with the injected constants
+        document.getElementById('g-display').textContent = G_VALUE;
+        document.getElementById('em-display').textContent = ALPHA_VALUE;
+        document.getElementById('sf-display').textContent = STRONG_FORCE;
+        document.getElementById('cc-display').textContent = LAMBDA_VALUE;
+
+        resetSimulation();
+        setupEventListeners();
+      };
+
+      function resetSimulation() {
+        // Reset slider values
+        document.getElementById('temperature').value = 5778;
+        document.getElementById('temp-value').textContent = "5778";
+        document.getElementById('star-mass').value = 1.0;
+        document.getElementById('mass-value').textContent = "1.0";
+        document.getElementById('sim-speed').value = 1.0;
+        document.getElementById('speed-value').textContent = "1.0";
+
+        // Reset internal variables
+        starLifecycle = 0;
+        starMass = 1.0;
+        starTemperature = 5778;
+        simulationSpeed = 1.0;
+
+
+        star = {
+          x: WIDTH / 2,
+          y: HEIGHT / 2,
+          radius: calculateStarRadius(),
+          color: getStarColor(starTemperature)
+        };
+
+        // Reset particle arrays
+        particles = [];
+        photons = [];
+        accretionDisk = [];
+
+        // Reset lifecycle state
+        blackHole = null;
+        updateStarState();
+
+        // Update display
+        document.getElementById('age-display').textContent = "0%";
+      }
+
+      function setupEventListeners() {
+        // Set up sliders for temperature and mass
+        document.getElementById('temperature').addEventListener('input', function() {
+          starTemperature = parseFloat(this.value);
+          document.getElementById('temp-value').textContent = starTemperature.toFixed(0);
+          star.color = getStarColor(starTemperature);
+        });
+
+        document.getElementById('star-mass').addEventListener('input', function() {
+          starMass = parseFloat(this.value);
+          document.getElementById('mass-value').textContent = starMass.toFixed(1);
+          star.radius = calculateStarRadius();
+          updateStarState();
+        });
+
+        document.getElementById('sim-speed').addEventListener('input', function() {
+          simulationSpeed = parseFloat(this.value);
+          document.getElementById('speed-value').textContent = simulationSpeed.toFixed(1);
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', resetSimulation);
+      }
+
+      function calculateStarRadius() {
+        // Base radius adjusted by mass and lifecycle stage
+        let baseRadius = 30 * Math.pow(starMass, 0.5);
+
+        // Adjust for lifecycle stage
+        if (starLifecycle > 80 && starMass > 8 * STRONG_FORCE) {
+          // Supernova precursor - collapse
+          return baseRadius * (1 - (starLifecycle - 80) / 20);
+        } else if (starLifecycle > 70 && starMass > 1.44 * STRONG_FORCE) {
+          // Red giant phase
+          return baseRadius * (1 + (starLifecycle - 70) / 10);
+        } else if (starLifecycle > 90 && starMass <= 8 * STRONG_FORCE && starMass > 1.44 * STRONG_FORCE) {
+          // White dwarf formation
+          return baseRadius * 0.3;
+        } else if (starLifecycle > 90 && starMass <= 1.44 * STRONG_FORCE) {
+          // Neutron star formation
+          return baseRadius * 0.1;
+        }
+
+        return baseRadius;
+      }
+
+      function getStarColor(temp) {
+        // Color based on blackbody radiation temperature
+        if (temp < 3500) return p.color(0, 80, 100); // Red
+        if (temp < 5000) return p.color(20, 80, 100); // Orange
+        if (temp < 6000) return p.color(40, 70, 100); // Yellow
+        if (temp < 7500) return p.color(60, 60, 100); // Yellow-white
+        if (temp < 10000) return p.color(180, 30, 100); // White
+        if (temp < 30000) return p.color(210, 70, 100); // Blue-white
+        return p.color(240, 80, 100); // Blue
+      }
+
+      function updateStarState() {
+        // Determine star state based on lifecycle and mass
+        if (starLifecycle < 70) {
+          starState = "Main Sequence";
+        } else if (starLifecycle < 90) {
+          if (starMass > 8 * STRONG_FORCE) {
+            starState = "Red Supergiant";
+          } else {
+            starState = "Red Giant";
+          }
+        } else if (starLifecycle >= 90) {
+          if (starMass > 25 * STRONG_FORCE) {
+            starState = "Black Hole";
+            // Create black hole if not already created
+            if (!blackHole) {
+              createBlackHole();
+            }
+          } else if (starMass > 8 * STRONG_FORCE) {
+            starState = "Neutron Star";
+          } else if (starMass > 1.44 * STRONG_FORCE) {
+            starState = "White Dwarf";
+          } else {
+            starState = "Brown Dwarf";
+          }
+        }
+
+        // Update explanation
+        updateExplanation();
+      }
+
+      function updateExplanation() {
+        let description;
+        switch (starState) {
+          case "Main Sequence":
+            description = `A ${starMass.toFixed(1)} solar mass star burning hydrogen. Constants: G=${G_VALUE}, EM=${ALPHA_VALUE}, SF=${STRONG_FORCE}, λ=${LAMBDA_VALUE}`;
+            break;
+          case "Red Giant":
+            description = `Star has exhausted hydrogen and expanded. Core temperature rising as helium fusion begins.`;
+            break;
+          case "Red Supergiant":
+            description = `Massive star nearing end of life. Multiple fusion shells active.`;
+            break;
+          case "White Dwarf":
+            description = `Star has shed outer layers, leaving a hot, dense core that will slowly cool over billions of years.`;
+            break;
+          case "Neutron Star":
+            description = `Extremely dense stellar remnant composed mostly of neutrons.`;
+            break;
+          case "Black Hole":
+            description = `Gravitational collapse complete. Event horizon radius: ${eventHorizonRadius.toFixed(1)} units. Nothing escapes, not even light.`;
+            break;
+          case "Brown Dwarf":
+            description = `Failed star without enough mass to sustain hydrogen fusion.`;
+            break;
+        }
+        document.getElementById('state-description').textContent = description;
+      }
+
+      function createBlackHole() {
+        blackHole = {
+          x: star.x,
+          y: star.y
+        };
+
+        // Event horizon size based on mass and gravitational constant
+        eventHorizonRadius = starMass * G_VALUE * 2;
+
+        // Create initial accretion disk
+        for (let i = 0; i < 60; i++) {
+          let angle = p.random(p.TWO_PI);
+          let distance = p.random(eventHorizonRadius * 1.2, eventHorizonRadius * 4);
+          accretionDisk.push({
+            x: blackHole.x + Math.cos(angle) * distance,
+            y: blackHole.y + Math.sin(angle) * distance,
+            angle: angle,
+            distance: distance,
+            speed: p.random(0.01, 0.05) * G_VALUE,
+            size: p.random(1, 3),
+            color: p.color(p.random(0, 40), 80, 100, 0.8)
+          });
+        }
+      }
+
+      function emitParticles() {
+        if (starState === "Black Hole") return;
+
+        // Emission rate based on star state and EM force
+        let emissionRate = 0.1 * ALPHA_VALUE * (1 + starLifecycle / 100);
+
+        if (p.random() < emissionRate) {
+          // Emit particles
+          let angle = p.random(p.TWO_PI);
+          let speed = p.random(0.5, 2) * ALPHA_VALUE;
+
+          // Different particles depending on star state
+          if (starState === "Main Sequence") {
+            // Regular stellar wind
+            particles.push({
+              x: star.x + Math.cos(angle) * star.radius,
+              y: star.y + Math.sin(angle) * star.radius,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              life: 255,
+              type: "hydrogen",
+              size: p.random(1, 3)
+            });
+          } else if (starState === "Red Giant" || starState === "Red Supergiant") {
+            // Heavier elements in later stages
+            particles.push({
+              x: star.x + Math.cos(angle) * star.radius,
+              y: star.y + Math.sin(angle) * star.radius,
+              vx: Math.cos(angle) * speed * 0.8,
+              vy: Math.sin(angle) * speed * 0.8,
+              life: 255,
+              type: "helium",
+              size: p.random(2, 4)
+            });
+          }
+        }
+
+        // Emit photons based on temperature and EM force
+        let photonRate = starTemperature / 10000 * ALPHA_VALUE;
+        if (p.random() < photonRate) {
+          let angle = p.random(p.TWO_PI);
+          let speed = 4 * ALPHA_VALUE;
+
+          photons.push({
+            x: star.x + Math.cos(angle) * star.radius,
+            y: star.y + Math.sin(angle) * star.radius,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 100,
+            color: star.color
+          });
+        }
+      }
+
+      function updateParticles() {
+        // Update particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+          let particle = particles[i];
+
+          // Apply gravity if G is significant
+          if (G_VALUE > 0.1) {
+            if (blackHole) {
+              // Gravity from black hole
+              let dx = blackHole.x - particle.x;
+              let dy = blackHole.y - particle.y;
+              let distSq = dx * dx + dy * dy;
+              let dist = Math.sqrt(distSq);
+
+              // Calculate gravitational force (stronger near black hole)
+              let force = G_VALUE * starMass * 0.01 / distSq;
+
+              // Apply force as acceleration
+              particle.vx += dx / dist * force;
+              particle.vy += dy / dist * force;
+
+              // Check if particle falls into black hole
+              if (dist < eventHorizonRadius) {
+                particles.splice(i, 1);
+                continue;
+              }
+            } else {
+              // Gravity from star
+              let dx = star.x - particle.x;
+              let dy = star.y - particle.y;
+              let distSq = dx * dx + dy * dy;
+              let dist = Math.sqrt(distSq);
+
+              // Calculate gravitational force
+              let force = G_VALUE * starMass * 0.0005 / distSq;
+
+              // Apply force as acceleration
+              particle.vx += dx / dist * force;
+              particle.vy += dy / dist * force;
+            }
+          }
+
+          // Apply cosmological constant (expansion)
+          if (LAMBDA_VALUE > 0) {
+            let dx = particle.x - WIDTH/2;
+            let dy = particle.y - HEIGHT/2;
+            particle.vx += dx * LAMBDA_VALUE * 0.0001;
+            particle.vy += dy * LAMBDA_VALUE * 0.0001;
+          }
+
+          // Update position
+          particle.x += particle.vx;
+          particle.y += particle.vy;
+
+          // Decrease life
+          particle.life -= 1;
+
+          // Remove dead particles
+          if (particle.life <= 0 ||
+              particle.x < 0 || particle.x > WIDTH ||
+              particle.y < 0 || particle.y > HEIGHT) {
+            particles.splice(i, 1);
+          }
+        }
+
+        // Update photons
+        for (let i = photons.length - 1; i >= 0; i--) {
+          let photon = photons[i];
+
+          // Black hole affects photons too!
+          if (blackHole && G_VALUE > 0.2) {
+            let dx = blackHole.x - photon.x;
+            let dy = blackHole.y - photon.y;
+            let distSq = dx * dx + dy * dy;
+            let dist = Math.sqrt(distSq);
+
+            // Light bending near black hole
+            let force = G_VALUE * starMass * 0.003 / distSq;
+
+            // Apply force as acceleration
+            photon.vx += dx / dist * force;
+            photon.vy += dy / dist * force;
+
+            // Check if photon falls into black hole
+            if (dist < eventHorizonRadius) {
+              photons.splice(i, 1);
+              continue;
+            }
+          }
+
+          // Update position
+          photon.x += photon.vx;
+          photon.y += photon.vy;
+
+          // Decrease life
+          photon.life -= 1.5;
+
+          // Remove dead photons
+          if (photon.life <= 0 ||
+              photon.x < 0 || photon.x > WIDTH ||
+              photon.y < 0 || photon.y > HEIGHT) {
+            photons.splice(i, 1);
+          }
+        }
+      }
+
+      function updateBlackHole() {
+        if (!blackHole) return;
+
+        // Update accretion disk
+        for (let i = 0; i < accretionDisk.length; i++) {
+          let particle = accretionDisk[i];
+
+          // Gradually spiral inward
+          particle.distance -= 0.05 * G_VALUE;
+          particle.angle += particle.speed * (eventHorizonRadius * 3 / particle.distance);
+
+          // Update position
+          particle.x = blackHole.x + Math.cos(particle.angle) * particle.distance;
+          particle.y = blackHole.y + Math.sin(particle.angle) * particle.distance;
+
+          // Remove if it falls in
+          if (particle.distance < eventHorizonRadius) {
+            // Replace with a new one
+            let angle = p.random(p.TWO_PI);
+            let distance = p.random(eventHorizonRadius * 3, eventHorizonRadius * 5);
+            accretionDisk[i] = {
+              x: blackHole.x + Math.cos(angle) * distance,
+              y: blackHole.y + Math.sin(angle) * distance,
+              angle: angle,
+              distance: distance,
+              speed: p.random(0.01, 0.05) * G_VALUE,
+              size: p.random(1, 3),
+              color: p.color(p.random(0, 40), 80, 100, 0.8)
+            };
+          }
+        }
+
+        // Occasionally emit jets along the axis if strong enough G
+        if (G_VALUE > 1.5 && p.random() < 0.1) {
+          // Polar jets from black hole
+          for (let i = 0; i < 2; i++) {
+            let angle = i * p.PI; // Up and down
+            let speed = p.random(3, 6) * G_VALUE;
+
+            particles.push({
+              x: blackHole.x + Math.cos(angle) * eventHorizonRadius * 1.2,
+              y: blackHole.y + Math.sin(angle) * eventHorizonRadius * 1.2,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              life: 150,
+              type: "jet",
+              size: p.random(2, 4)
+            });
+          }
+        }
+      }
+
+      p.draw = function() {
+        p.background(0);
+
+        // Draw background stars
+        drawBackgroundStars();
+
+        // Update star age naturally over time
+        if (p.frameCount % 30 === 0 && !paused) {
+          starLifecycle += 0.25 * simulationSpeed;
+          if (starLifecycle > 100) starLifecycle = 100;
+
+          // Update display
+          document.getElementById('age-display').textContent = Math.floor(starLifecycle) + "%";
+
+          // Update star state and radius
+          updateStarState();
+          star.radius = calculateStarRadius();
+        }
+
+        // Emit and update particles
+        emitParticles();
+        updateParticles();
+
+        // Update black hole if it exists
+        if (blackHole) {
+          updateBlackHole();
+        }
+
+        // Draw photons with glow
+        p.noStroke();
+        for (let photon of photons) {
+          p.fill(p.hue(photon.color), p.saturation(photon.color), p.brightness(photon.color), photon.life / 100);
+          p.ellipse(photon.x, photon.y, 2, 2);
+        }
+
+        // Draw particles
+        for (let particle of particles) {
+          if (particle.type === "hydrogen") {
+            p.fill(180, 50, 80, particle.life / 255);
+            p.ellipse(particle.x, particle.y, particle.size, particle.size);
+          } else if (particle.type === "helium") {
+            p.fill(60, 70, 90, particle.life / 255);
+            p.ellipse(particle.x, particle.y, particle.size, particle.size);
+          } else if (particle.type === "jet") {
+            p.fill(270, 80, 100, particle.life / 150);
+            p.ellipse(particle.x, particle.y, particle.size, particle.size);
+          }
+        }
+
+        // Draw star if not a black hole
+        if (starState !== "Black Hole") {
+          // Draw star glow
+          let glowSize = star.radius * 1.5;
+          let glowColor = p.color(p.hue(star.color), p.saturation(star.color), p.brightness(star.color), 0.2);
+          p.fill(glowColor);
+          p.ellipse(star.x, star.y, glowSize * 2, glowSize * 2);
+
+          // Draw star
+          p.fill(star.color);
+          p.ellipse(star.x, star.y, star.radius * 2, star.radius * 2);
+
+          // Draw fusion core if strong force is visible
+          if (STRONG_FORCE > 0.5 && starState === "Main Sequence") {
+            p.fill(60, 100, 100, 0.7);
+            p.ellipse(star.x, star.y, star.radius * 0.6, star.radius * 0.6);
+          }
+        } else {
+          // Draw black hole
+          // First draw accretion disk
+          for (let particle of accretionDisk) {
+            p.fill(particle.color);
+            p.ellipse(particle.x, particle.y, particle.size, particle.size);
+          }
+
+          // Draw event horizon
+          p.fill(0);
+          p.stroke(100, 0, 30);
+          p.ellipse(blackHole.x, blackHole.y, eventHorizonRadius * 2, eventHorizonRadius * 2);
+          p.noStroke();
+        }
+
+        // Draw star state and physics info
+        p.fill(255);
+        p.textSize(14);
+        p.text(starState, star.x, star.y - star.radius - 20);
+      };
+
+      function drawBackgroundStars() {
+        // Draw distant stars that don't move
+        for (let i = 0; i < 100; i++) {
+          let x = p.noise(i * 0.1, 0) * WIDTH;
+          let y = p.noise(0, i * 0.1) * HEIGHT;
+          let size = p.noise(i * 0.2) * 2;
+
+          // Make stars affected by cosmological constant
+          if (LAMBDA_VALUE > 1) {
+            let dx = x - WIDTH/2;
+            let dy = y - HEIGHT/2;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            let expansion = 1 + (LAMBDA_VALUE - 1) * 0.2;
+            x = WIDTH/2 + dx * expansion;
+            y = HEIGHT/2 + dy * expansion;
+          }
+
+          p.fill(60, 10, 100, 0.8);
+          p.ellipse(x, y, size, size);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
