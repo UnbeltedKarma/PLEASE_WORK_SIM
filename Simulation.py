@@ -388,7 +388,7 @@ p5_html = f"""
             this.size = this.mass * 4;
             this.color = p.color(255, 255, 255);
             this.type = this.determineElementType();
-            this.lifespan = 1000;
+            this.lifespan = 2000;
             this.stable = true;
             this.energy = p.random(0, 10);
             this.applyElementProperties();
@@ -424,7 +424,7 @@ p5_html = f"""
                 this.color = p.color(130, 170, 255); // Light blue
                 this.mass *= 0.8;
                 this.size = this.mass * 3;
-                this.fusionChance = 0.003 * STRONG_FORCE;
+                this.fusionChance = 0.002 * STRONG_FORCE;
                 break;
               case "helium":
                 this.color = p.color(200, 200, 255); // Pale blue
@@ -512,7 +512,7 @@ p5_html = f"""
             // Strong force and alpha force affect stability
             if (STRONG_FORCE < 0.3 || ALPHA_VALUE < 0.05) {{
               this.stable = false;
-              if (p.random(1) < 0.01) this.disintegrate();
+              if (p.random(1) < 0.002) this.disintegrate();
             }}
             else if (STRONG_FORCE > 5 || ALPHA_VALUE > 1.5) {{
               if (p.random(1) < this.fusionChance && stars.length < 15) this.formStar();
@@ -882,12 +882,12 @@ p5_html = f"""
           }}
           
           // Life needs carbon, stars, stable atoms, and moderate conditions
-          return (carbonCount > 5 && 
+          return (carbonCount >= 1 && 
                   stars.length > 2 && 
                   ALPHA_VALUE > 0.8 && ALPHA_VALUE < 1.2 &&
                   G_VALUE > 0.8 && G_VALUE < 1.5 &&
                   STRONG_FORCE > 0.8 && STRONG_FORCE < 2.0 &&
-                  carbonMolecules > 1);
+                  carbonMolecules >= 1);
         }}
 
     p.setup = function() {{
@@ -969,20 +969,36 @@ p5_html = f"""
       }}
 
       // Update and draw particles
-      for (let i = particles.length - 1; i >= 0; i--) {{
-        particles[i].update();
-        particles[i].draw();
-
-        // Remove dead particles
-        if (particles[i].isDead()) {{
-          particles.splice(i, 1);
+        for (let i = particles.length - 1; i >= 0; i--) {{
+          particles[i].update();
+        
+          let particleDestroyed = false;
+        
+          // Check collision with black holes
+          for (let j = 0; j < stars.length; j++) {{
+            let star = stars[j];
+            if (star instanceof BlackHole) {{
+              let distToBH = p5.Vector.dist(particles[i].pos, star.pos);
+              if (distToBH < star.size * 2) {{  // You can tweak this size buffer
+                particleDestroyed = true;
+                break;
+              }}
+            }}
+          }}
+        
+          if (!particleDestroyed && !particles[i].isDead()) {{
+            particles[i].draw();
+          }} else {{
+            particles.splice(i, 1);  // Remove particle if it was eaten or dead
+          }}
         }}
-      }}
 
       // Add new particles occasionally to maintain population
-      if (particles.length < 50 && p.frameCount % 30 === 0) {{
-        particles.push(new Particle());
-      }}
+      if (particles.length < 200 && p.frameCount % 10 === 0) {{
+          for (let i = 0; i < 2; i++) {{
+            particles.push(new Particle());
+          }}
+        }}
 
       // Update UI elements
       updateControls();
