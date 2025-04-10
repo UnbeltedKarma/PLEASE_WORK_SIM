@@ -7,6 +7,7 @@ import numpy as np
 import random
 import plotly.graph_objects as go
 import math as Math
+import os
 
 from pyparsing import oneOf
 
@@ -353,26 +354,33 @@ st.plotly_chart(fig, use_container_width=True)
 # Universe Simulation Section
 st.title("⚛️ Interactive Universe Simulation")
 
+# Use relative path based on the current script location
+current_dir = os.path.dirname(os.path.abspath(__file__))
+file_path = os.path.join(current_dir, "universe_sim.html")
+
 # Display the html document
-file_path = "C:/Users/dan/PycharmProjects/PLEASE_WORK_SIM/universe_sim.html"
 with open(file_path, "r", encoding="utf-8") as f:
     html_template = f.read()
 html_string = html_template.replace("{G}", str(G)) \
-                           .replace("{alpha}", str(alpha)) \
-                           .replace("{strong_force}", str(strong_force)) \
-                           .replace("{lambda_const}", str(lambda_const))
+                          .replace("{alpha}", str(alpha)) \
+                          .replace("{strong_force}", str(strong_force)) \
+                          .replace("{lambda_const}", str(lambda_const))
 st.components.v1.html(html_string, height=550, scrolling=False)
 
 
 st.title("☀️ Sun Simulator ")
 
-file_path = "C:/Users/dan/PycharmProjects/PLEASE_WORK_SIM/universe_sim3.html"
+# Use relative path based on the current script location
+current_dir = os.path.dirname(os.path.abspath(__file__))
+file_path = os.path.join(current_dir, "universe_sim3.html")
+
+# Display the html document
 with open(file_path, "r", encoding="utf-8") as f:
     html_template = f.read()
 html_string = html_template.replace("{G}", str(G)) \
-                           .replace("{alpha}", str(alpha)) \
-                           .replace("{strong_force}", str(strong_force)) \
-                           .replace("{lambda_const}", str(lambda_const))
+                          .replace("{alpha}", str(alpha)) \
+                          .replace("{strong_force}", str(strong_force)) \
+                          .replace("{lambda_const}", str(lambda_const))
 st.components.v1.html(html_string, height=550, scrolling=False)
 
 # Add explanation for simulation

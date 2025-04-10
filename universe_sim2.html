@@ -1,0 +1,1159 @@
+<div id="universe-sim" style="position: relative; width: 700px; height: 500px;">
+ <div id="canvas-container"></div>
+ <div id="controls-overlay" style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; color: white; font-family: monospace;">
+ </div>
+ <div id="explanation-overlay" style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; color: white; font-family: sans-serif; max-width: 300px; font-size: 12px;">
+ </div>
+</div>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+<script>
+ new p5(function(p) {
+   // IMPROVED PHYSICS SIMULATION
+   let particles = [];
+   let stars = [];
+   let radiation = [];  // NEW: Radiation particles
+   let universeAge = 0;
+   let universeState = "Forming";
+   let starCount = 0;
+   let galaxyFormed = false;
+   let totalMass = 0;  // NEW: Track total mass for critical density calculations
+   let universeRadius = 250;  // Initial universe radius (pixels)
+   let universeExpansionRate = 0;  // NEW: Dynamic expansion rate
+   let nucleosynthesisOccurred = false;  // NEW: Track if primordial nucleosynthesis has occurred
+
+
+   // Constants from sliders
+   const G_VALUE = {G}; // Replace later with "{G}
+   const ALPHA_VALUE = {alpha}; // Replace later with "{alpha}
+   const STRONG_FORCE = {strong_force}; // Replace later with "{strong_force}
+   const LAMBDA_VALUE = {lambda_const}; // Replace later with "{lambda_const}
+
+
+   // NEW: Derived physical quantities
+   const CRITICAL_DENSITY = G_VALUE * 3.0;  // Simplified critical density
+   const ELECTRON_BINDING_ENERGY = ALPHA_VALUE * 13.6;  // eV, loosely based on hydrogen
+   const FUSION_THRESHOLD = STRONG_FORCE * 0.01;  // Threshold for fusion reactions
+   const HUBBLE_PARAMETER = Math.sqrt(LAMBDA_VALUE) * 0.1;  // Simplified Hubble parameter
+
+
+   // NEW: Temperature model - universe cools as it expands
+   let universeTemperature = 10000;  // Initial hot universe (arbitrary units)
+
+
+   // NEW: Constants of Nature (unchangeable)
+   const SPEED_OF_LIGHT = 10;  // Maximum speed in simulation
+   const PLANCK_CONSTANT = 0.1;  // For quantum effects
+
+
+   // NEW: Physics convenience functions
+   function calculateDensity() {
+     const volume = Math.PI * universeRadius * universeRadius;  // 2D "volume"
+     return totalMass / (volume || 1);  // Avoid division by zero
+   }
+
+
+   function isCriticalDensity() {
+     const density = calculateDensity();
+     return Math.abs(density - CRITICAL_DENSITY) / CRITICAL_DENSITY < 0.2;  // Within 20% of critical
+   }
+
+
+   function updateUniverseExpansion() {
+     // Based on Lambda and gravitational mass
+     const density = calculateDensity();
+     const gravitationalContraction = G_VALUE * density * 0.01;
+     const darkEnergyExpansion = LAMBDA_VALUE * universeRadius * 0.0001;
+
+
+     universeExpansionRate = darkEnergyExpansion - gravitationalContraction;
+     universeRadius += universeExpansionRate;
+
+
+     // Prevent universe from collapsing completely
+     universeRadius = Math.max(universeRadius, 50);
+
+
+     // Update temperature based on expansion (simplified model)
+     const expansionFactor = universeRadius / 250;  // Relative to initial size
+     universeTemperature = 10000 / expansionFactor;  // Temperature ~ 1/size
+   }
+
+
+   class Particle {
+     constructor(x, y) {
+       this.pos = p.createVector(x || p.random(p.width/2 - universeRadius/2, p.width/2 + universeRadius/2),
+                                y || p.random(p.height/2 - universeRadius/2, p.height/2 + universeRadius/2));
+       this.vel = p.createVector(p.random(-0.5, 0.5), p.random(-0.5, 0.5));
+       this.acc = p.createVector(0, 0);
+       this.mass = p.random(0.5, 1.5);
+       this.size = this.mass * 4;
+       this.color = p.color(255, 255, 255);
+       this.type = this.determineElementType();
+       this.lifespan = 2000;
+       this.stable = true;
+       this.energy = p.random(0, 10);
+       this.bonds = [];  // NEW: Track chemical bonds
+       this.quantum_state = Math.floor(p.random(3));  // NEW: Quantum states (0, 1, 2)
+       this.applyElementProperties();
+     }
+
+
+     determineElementType() {
+       // IMPROVED: Element distribution based on universe age and physics
+       // Early universe: mostly hydrogen and helium
+       if (universeAge < 100) {
+         // Big Bang Nucleosynthesis - affected by strong force
+         if (universeTemperature > 1000 && STRONG_FORCE > 0.5) {
+           return p.random(1) < 0.75 ? "hydrogen" : "helium";
+         } else {
+           return "hydrogen";  // Too cold or weak force for helium formation
+         }
+       }
+
+
+       // More mature universe: include heavier elements
+       else {
+         // Element distribution depends on strong force and star formation history
+         let random = p.random(1);
+
+
+         if (STRONG_FORCE < 0.5) {
+           // Mostly hydrogen in weak strong force universes
+           return random < 0.9 ? "hydrogen" : "helium";
+         } else if (STRONG_FORCE > 2.0) {
+           // More heavy elements with strong nuclear force
+           if (random < 0.4) return "hydrogen";
+           else if (random < 0.6) return "helium";
+           else if (random < 0.8) return "carbon";
+           else if (random < 0.95) return "iron";
+           else return "uranium";  // NEW: Very heavy element
+         } else {
+           // Balanced universe like ours
+           if (random < 0.6) return "hydrogen";
+           else if (random < 0.8) return "helium";
+           else if (random < 0.9) return "carbon";
+           else if (random < 0.98) return "iron";
+           else return "uranium";
+         }
+       }
+     }
+
+
+     applyElementProperties() {
+       // Different elements have different properties
+       switch(this.type) {
+         case "hydrogen":
+           this.color = p.color(130, 170, 255); // Light blue
+           this.mass = 1.0;
+           this.size = this.mass * 3;
+           this.fusionChance = 0.002 * STRONG_FORCE * (universeTemperature/1000);
+           this.bindingEnergy = ELECTRON_BINDING_ENERGY;
+           this.neutrons = 0;
+           this.protons = 1;
+           break;
+         case "helium":
+           this.color = p.color(200, 200, 255); // Pale blue
+           this.mass = 4.0;
+           this.size = this.mass * 2;
+           this.fusionChance = 0.001 * STRONG_FORCE * (universeTemperature/2000);
+           this.bindingEnergy = ELECTRON_BINDING_ENERGY * 1.5;
+           this.neutrons = 2;
+           this.protons = 2;
+           break;
+         case "carbon":
+           this.color = p.color(100, 220, 100); // Green
+           this.mass = 12.0;
+           this.size = this.mass * 1.5;
+           this.fusionChance = 0.0005 * STRONG_FORCE * (universeTemperature/5000);
+           this.bindingEnergy = ELECTRON_BINDING_ENERGY * 2.5;
+           this.neutrons = 6;
+           this.protons = 6;
+           this.valenceElectrons = 4;  // NEW: Carbon has 4 valence electrons for bonding
+           break;
+         case "iron":
+           this.color = p.color(255, 150, 50); // Orange
+           this.mass = 56.0;
+           this.size = this.mass * 1;
+           this.fusionChance = 0;  // Iron doesn't fuse in stars (end of stellar fusion)
+           this.bindingEnergy = ELECTRON_BINDING_ENERGY * 3;
+           this.neutrons = 30;
+           this.protons = 26;
+           break;
+         case "uranium":
+           this.color = p.color(230, 230, 150); // Yellow-green
+           this.mass = 238.0;
+           this.size = this.mass * 0.8;
+           this.fusionChance = 0;
+           this.bindingEnergy = ELECTRON_BINDING_ENERGY * 3.5;
+           this.decayChance = 0.0001;  // NEW: Radioactive decay
+           this.neutrons = 146;
+           this.protons = 92;
+           break;
+       }
+
+
+       // NEW: Nuclear stability based on strong force
+       const idealNeutronRatio = 1.0 + this.protons / 20;  // Simplified nuclear stability model
+       const actualNeutronRatio = this.neutrons / (this.protons || 1);
+       this.nuclearStability = 1.0 - Math.abs(idealNeutronRatio - actualNeutronRatio);
+
+
+       // NEW: Electromagnetic force affects atomic stability
+       if (ALPHA_VALUE < 0.05) {
+         this.stability = 0.1; // Very unstable - electrons unbounded
+       } else if (ALPHA_VALUE > 1.5) {
+         this.stability = 0.5; // Somewhat unstable - electrons too tightly bound
+       } else {
+         this.stability = 0.9; // Stable atoms
+       }
+
+
+       // NEW: Strong force affects nuclear stability
+       this.nuclearStability *= STRONG_FORCE > 0.3 ? 1.0 : 0.2;
+
+
+       // NEW: Adjust size based on temperature (thermal expansion)
+       this.baseSize = this.size;
+       this.updateSizeWithTemperature();
+
+
+       // Update the total mass of the universe
+       totalMass += this.mass;
+     }
+
+
+     // NEW: Temperature effects on particle size
+     updateSizeWithTemperature() {
+       // Simple thermal expansion model
+       const tempFactor = universeTemperature / 5000;
+       this.size = this.baseSize * (1 + 0.2 * tempFactor);
+     }
+
+
+     applyForce(force) {
+       // F = ma, so a = F/m
+       let f = p5.Vector.div(force, this.mass);
+       this.acc.add(f);
+     }
+
+
+     // IMPROVED: More accurate gravitational model
+     gravitationalAttraction(other) {
+       // Calculate direction of force
+       let force = p5.Vector.sub(other.pos, this.pos);
+       let distance = force.mag();
+
+
+       // Minimum distance to prevent extreme forces
+       distance = p.constrain(distance, 10, 1000);
+
+
+       // Normalize to get direction
+       force.normalize();
+
+
+       // Calculate gravitational force - now with proper mass dependency
+       let strength = (G_VALUE * this.mass * other.mass) / (distance * distance);
+       force.mult(strength);
+
+
+       return force;
+     }
+
+
+     // IMPROVED: More accurate expansion model based on Hubble's Law
+     expansionForce() {
+       // Position relative to universe center
+       let center = p.createVector(p.width/2, p.height/2);
+       let distanceVector = p5.Vector.sub(this.pos, center);
+       let distance = distanceVector.mag();
+
+
+       // No expansion near the center (nonlinear effects)
+       if (distance < 10) return p.createVector(0, 0);
+
+
+       // Hubble's Law: v = H₀ × d
+       let expansionVelocity = HUBBLE_PARAMETER * distance;
+
+
+       // Convert to acceleration
+       distanceVector.normalize();
+       distanceVector.mult(expansionVelocity * LAMBDA_VALUE * 0.01);
+
+
+       return distanceVector;
+     }
+
+
+     // NEW: Electromagnetic interaction between particles
+     electrostaticForce(other) {
+       // Only applies if alpha value is significant
+       if (ALPHA_VALUE < 0.1) return p.createVector(0, 0);
+
+
+       let force = p5.Vector.sub(other.pos, this.pos);
+       let distance = force.mag();
+
+
+       // Minimum distance to prevent extreme forces
+       distance = p.constrain(distance, 20, 200);
+
+
+       // Normalize to get direction
+       force.normalize();
+
+
+       // Electric force depends on "charge" (simplification)
+       // We're treating proton count as charge for simplicity
+       let strength = ALPHA_VALUE * 0.1 * this.protons * other.protons / (distance * distance);
+
+
+       // Opposite charges attract (we're not modeling this complexity)
+       force.mult(strength);
+
+
+       return force;
+     }
+
+
+     // NEW: Quantum tunneling effect
+     quantumTunnel() {
+       // Quantum tunneling more likely with lower alpha (weaker EM force)
+       if (p.random() < PLANCK_CONSTANT / (ALPHA_VALUE + 0.1)) {
+         // Random displacement
+         let tunnelDistance = p.random(5, 20);
+         let tunnelDirection = p5.Vector.random2D();
+         this.pos.add(p5.Vector.mult(tunnelDirection, tunnelDistance));
+       }
+     }
+
+
+     update() {
+       // Update position with velocity and acceleration
+       this.vel.add(this.acc);
+       this.vel.limit(SPEED_OF_LIGHT); // Terminal velocity is speed of light
+       this.pos.add(this.vel);
+       this.acc.mult(0); // Reset acceleration
+
+
+       // Update size based on temperature
+       this.updateSizeWithTemperature();
+
+
+       // Universe age affects particle behavior
+       this.lifespan--;
+
+
+       // NEW: Quantum effects
+       if (this.mass < 2) {  // Only for very light particles
+         this.quantumTunnel();
+       }
+
+
+       // NEW: Radioactive decay
+       if (this.type === "uranium" && p.random() < this.decayChance) {
+         this.decay();
+       }
+
+
+       // Potential chemical bonding with nearby particles
+       if (universeTemperature < 3000) {  // Chemistry only works at cooler temperatures
+         this.attemptBonding();
+       }
+
+
+       // Strong force and alpha force affect stability
+       if (STRONG_FORCE < 0.3) {
+         // Nuclear instability
+         if (p.random(1) < 0.002 * (1 - this.nuclearStability)) {
+           this.disintegrate();
+         }
+       }
+       else if (ALPHA_VALUE < 0.05) {
+         // Electron unbinding
+         if (p.random(1) < 0.002 * (1 - this.stability)) {
+           this.ionize();
+         }
+       }
+
+
+       // NEW: Star formation based on density and temperature
+       if (this.canFormStar() && stars.length < 20) {
+         this.formStar();
+       }
+
+
+       // Boundary wrap - now considers expanding universe
+       const maxRadius = universeRadius * 1.2;
+       const distFromCenter = p.dist(this.pos.x, this.pos.y, p.width/2, p.height/2);
+
+
+       if (distFromCenter > maxRadius) {
+         // Redirect toward center instead of wrapping
+         const centerDir = p5.Vector.sub(p.createVector(p.width/2, p.height/2), this.pos);
+         centerDir.normalize();
+         this.vel = p5.Vector.mult(centerDir, this.vel.mag() * 0.5);
+       }
+     }
+
+
+     // NEW: Determines if star formation is possible
+     canFormStar() {
+       // Star formation requires:
+       // 1. Hydrogen/helium
+       // 2. Sufficient density (check for nearby particles)
+       // 3. Appropriate temperature
+       // 4. Sufficient gravity
+
+
+       if (this.type !== "hydrogen" && this.type !== "helium") return false;
+       if (G_VALUE < 0.3) return false;
+       if (universeTemperature > 5000) return false;  // Too hot, particles move too fast
+
+
+       // Check for nearby particles (simplified density check)
+       let nearbyCount = 0;
+       for (let i = 0; i < particles.length; i++) {
+         if (p5.Vector.dist(this.pos, particles[i].pos) < 30) {
+           nearbyCount++;
+         }
+         if (nearbyCount > 5) break;  // Efficiency
+       }
+
+
+       return nearbyCount > 5 && p.random() < this.fusionChance;
+     }
+
+
+     attemptBonding() {
+       // Only carbon can form complex bonds for life chemistry
+       // Now with more realistic bonding model
+       if (this.type === "carbon" && this.valenceElectrons && ALPHA_VALUE > 0.7 && ALPHA_VALUE < 1.3) {
+         // Find nearby particles for bonding
+         for (let i = 0; i < particles.length; i++) {
+           if (particles[i] !== this) {
+             let other = particles[i];
+             let distance = p5.Vector.dist(this.pos, other.pos);
+
+
+             // Chemical bonding distance - depends on electromagnetic force
+             const bondingDistance = 15 * (1 / (ALPHA_VALUE || 1));
+
+
+             if (distance < bondingDistance) {
+               // Bonding probability based on chemistry
+               let bondProbability = 0.001;
+
+
+               // Carbon-hydrogen bond (organic chemistry)
+               if (other.type === "hydrogen") bondProbability *= 2;
+
+
+               // Carbon-carbon bond (complex organic molecules)
+               if (other.type === "carbon") bondProbability *= 3;
+
+
+               // Check for bond formation
+               if (p.random(1) < bondProbability && this.bonds.length < this.valenceElectrons) {
+                 // Form bond
+                 this.color = p.color(0, 255, 100); // Bright green for molecules
+                 other.color = p.color(0, 255, 100);
+
+
+                 // Track the bond
+                 if (!this.bonds.includes(other)) {
+                   this.bonds.push(other);
+                 }
+
+
+                 // Add bond to other particle too
+                 if (other.bonds && !other.bonds.includes(this)) {
+                   other.bonds.push(this);
+                 }
+
+
+                 // Bonded particles attract each other
+                 let bondForce = p5.Vector.sub(other.pos, this.pos);
+                 bondForce.setMag(0.05 * ALPHA_VALUE);
+                 this.applyForce(bondForce);
+               }
+             }
+           }
+         }
+       }
+     }
+
+
+     formStar() {
+       if (G_VALUE > 0.3 && G_VALUE < 5.0) {
+         // Hydrogen and helium fuse more easily to form stars
+         if (this.type === "hydrogen" || this.type === "helium") {
+           // Create star and reduce particle mass
+           stars.push(new Star(this.pos.x, this.pos.y, this.type));
+           this.lifespan = 0; // Consume the particle
+
+
+           // Emit radiation from fusion
+           this.emitRadiation();
+         }
+       }
+     }
+
+
+     // NEW: Particle decay (for radioactive elements)
+     decay() {
+       this.emitRadiation();
+
+
+       // Radioactive decay produces lighter elements
+       this.type = "lead";  // Simplified - uranium decays to lead
+       this.color = p.color(180, 180, 180);
+       this.mass *= 0.95;  // Mass is conserved (approximately)
+       this.lifespan = 2000;  // Reset lifespan
+     }
+
+
+     // NEW: Ionization (electron loss)
+     ionize() {
+       this.emitRadiation();
+       this.color = p.lerpColor(this.color, p.color(255, 0, 255), 0.5);  // Purple tint for ions
+     }
+
+
+     // NEW: Radiation emission
+     emitRadiation() {
+       // Create radiation particle
+       let rad = new Radiation(this.pos.x, this.pos.y);
+       radiation.push(rad);
+     }
+
+
+     disintegrate() {
+       this.lifespan = 0;
+       totalMass -= this.mass;  // Update total mass
+
+
+       // Add disintegration effect
+       for (let i = 0; i < 5; i++) {
+         let dp = new DisintegrationParticle(this.pos.x, this.pos.y);
+         particles.push(dp);
+         totalMass += dp.mass;  // Add new mass to total
+       }
+     }
+
+
+     draw() {
+       p.noStroke();
+       p.fill(this.color);
+       p.ellipse(this.pos.x, this.pos.y, this.size, this.size);
+
+
+       // Draw bonds if any
+       if (this.bonds && this.bonds.length > 0) {
+         p.stroke(0, 255, 100, 100);
+         p.strokeWeight(1);
+         for (let bond of this.bonds) {
+           if (bond.lifespan > 0) {  // Only draw bonds to living particles
+             p.line(this.pos.x, this.pos.y, bond.pos.x, bond.pos.y);
+           }
+         }
+       }
+
+
+       // Show element type when hovering
+       if (p.dist(p.mouseX, p.mouseY, this.pos.x, this.pos.y) < this.size) {
+         p.fill(255);
+         p.textSize(10);
+         p.text(this.type + " (" + this.protons + "p+" + this.neutrons + "n)", this.pos.x + 10, this.pos.y);
+       }
+     }
+
+
+     isDead() {
+       return this.lifespan <= 0;
+     }
+   }
+
+
+   // NEW: Radiation particle class
+   class Radiation {
+     constructor(x, y) {
+       this.pos = p.createVector(x, y);
+       this.vel = p5.Vector.random2D().mult(SPEED_OF_LIGHT * 0.8);  // Radiation moves fast
+       this.lifespan = p.random(30, 60);
+       this.size = 2;
+       this.color = p.color(255, 255, 0, 150);  // Yellow for radiation
+       this.energy = p.random(1, 5);
+     }
+
+
+     update() {
+       this.pos.add(this.vel);
+       this.lifespan--;
+       this.color = p.color(255, 255, 0, this.lifespan * 2);
+     }
+
+
+     draw() {
+       p.noStroke();
+       p.fill(this.color);
+       p.ellipse(this.pos.x, this.pos.y, this.size, this.size);
+     }
+
+
+     isDead() {
+       return this.lifespan <= 0;
+     }
+   }
+
+
+   // IMPROVED: More complex star model with fusion chains
+   class Star {
+     constructor(x, y, sourceElement) {
+       this.pos = p.createVector(x, y);
+       this.mass = p.random(3, 8);
+       this.size = this.mass * 2;
+       this.lifespan = p.random(500, 2000);
+       this.sourceElement = sourceElement || "hydrogen";
+       this.color = this.determineColor();
+       this.pulseRate = p.random(0.02, 0.05);
+       this.pulseAmount = 0;
+       this.stellarClass = this.determineStellarClass();
+       this.coreFusion = this.determineFusionChain();
+
+
+       // Stars produce elements based on their mass and type
+       this.productionRate = 0.001 * STRONG_FORCE;
+       this.temperature = 5000 + this.mass * 1000;
+
+
+       // Fusion rates for different elements
+       this.fusionRates = {
+         hydrogen: 0.003 * STRONG_FORCE,
+         helium: 0.001 * STRONG_FORCE,
+         carbon: 0.0005 * STRONG_FORCE,
+         oxygen: 0.0002 * STRONG_FORCE
+       };
+
+
+       // Track elements present in the star
+       this.composition = {
+         hydrogen: this.sourceElement === "hydrogen" ? 0.7 : 0.5,
+         helium: this.sourceElement === "helium" ? 0.5 : 0.29,
+         carbon: 0.01,
+         oxygen: 0,
+         iron: 0
+       };
+
+
+       starCount++;
+     }
+
+
+     determineColor() {
+       // Star color based on temperature/mass
+       if (this.mass > 6) {
+         return p.color(180, 180, 255);  // Hot blue star
+       } else if (this.mass > 4) {
+         return p.color(220, 220, 255);  // White-blue star
+       } else if (this.mass > 2) {
+         return p.color(255, 255, 180);  // Yellow star (Sun-like)
+       } else {
+         return p.color(255, 200, 150);  // Orange-red dwarf
+       }
+     }
+
+
+     // NEW: Determine stellar classification
+     determineStellarClass() {
+       if (this.mass > 6) return "O";  // Hot blue stars
+       if (this.mass > 4) return "B";
+       if (this.mass > 3) return "A";
+       if (this.mass > 2) return "F";
+       if (this.mass > 1.5) return "G";  // Sun-like
+       if (this.mass > 1) return "K";
+       return "M";  // Red dwarfs
+     }
+
+
+     // NEW: Determine fusion chain based on mass
+     determineFusionChain() {
+       if (this.mass > 5) {
+         return ["hydrogen", "helium", "carbon", "oxygen", "silicon", "iron"];
+       } else if (this.mass > 3) {
+         return ["hydrogen", "helium", "carbon", "oxygen"];
+       } else {
+         return ["hydrogen", "helium"];
+       }
+     }
+
+
+     update() {
+       // Star lifecycle based on G and strong force
+       // Larger stars burn faster
+       this.lifespan -= (G_VALUE * STRONG_FORCE / 1.0) * (this.mass / 3);
+
+
+       // Pulsing effect
+       this.pulseAmount = p.sin(universeAge * this.pulseRate) * 2;
+
+
+       // Process stellar nucleosynthesis - fusion chain
+       this.processFusion();
+
+
+       if (this.lifespan <= 100) {
+         // Red giant phase
+         this.color = p.color(255, 50, 50);
+         this.size = this.size * 1.5;  // Expand during red giant phase
+       }
+     }
+
+
+     // NEW: Process fusion chain
+     processFusion() {
+       if (STRONG_FORCE < 0.3) return;  // Strong force too weak for fusion
+
+
+       // Process the fusion chain in order
+       for (let i = 0; i < this.coreFusion.length - 1; i++) {
+         const currentElement = this.coreFusion[i];
+         const nextElement = this.coreFusion[i+1];
+
+
+         // Skip if not enough of current element
+         if (!this.composition[currentElement] || this.composition[currentElement] < 0.01) continue;
+
+
+         // Calculate fusion rate based on temperature, strong force and star age
+         const baseFusionRate = this.fusionRates[currentElement] || 0.0001;
+         const fusionModifier = this.lifespan < 500 ? 2 : 1;  // Fusion accelerates in older stars
+         const actualFusionRate = baseFusionRate * fusionModifier;
+
+
+         // Process fusion
+         if (p.random() < actualFusionRate) {
+           // Convert element to next in chain
+           const convertAmount = 0.002;
+           this.composition[currentElement] -= convertAmount;
+           this.composition[nextElement] = (this.composition[nextElement] || 0) + convertAmount * 0.9;  // 90% efficiency
+
+
+           // Occasionally produce new elements through fusion
+           this.produceElement(nextElement);
+
+
+           // Create radiation
+           if (p.random() < 0.2) {
+             let radiationParticle = new Radiation(
+               this.pos.x + p.random(-this.size, this.size),
+               this.pos.y + p.random(-this.size, this.size)
+             );
+             radiation.push(radiationParticle);
+           }
+         }
+       }
+     }
+
+
+     produceElement(elementType) {
+       // Skip if strong force too weak
+       if (STRONG_FORCE < 0.5) return;
+
+
+       // Add new particle near the star
+       if (p.random() < this.productionRate) {
+         let offset = p5.Vector.random2D().mult(this.size * 1.5);
+         let newParticle = new Particle(this.pos.x + offset.x, this.pos.y + offset.y);
+         newParticle.type = elementType;
+         newParticle.applyElementProperties();
+         particles.push(newParticle);
+         totalMass += newParticle.mass;
+       }
+     }
+
+
+     draw() {
+       // Glow effect
+       p.noStroke();
+       let glowSize = this.size + this.pulseAmount + 5;
+       p.fill(p.red(this.color), p.green(this.color), p.blue(this.color), 50);
+       p.ellipse(this.pos.x, this.pos.y, glowSize * 2, glowSize * 2);
+       p.fill(p.red(this.color), p.green(this.color), p.blue(this.color), 100);
+       p.ellipse(this.pos.x, this.pos.y, glowSize * 1.5, glowSize * 1.5);
+
+
+       // Star body
+       p.fill(this.color);
+       p.ellipse(this.pos.x, this.pos.y, this.size + this.pulseAmount, this.size + this.pulseAmount);
+
+
+       // Show
+       // Show star info on hover
+       if (p.dist(p.mouseX, p.mouseY, this.pos.x, this.pos.y) < this.size) {
+         p.fill(255);
+         p.textSize(10);
+         p.text(this.stellarClass + "-class star", this.pos.x + 10, this.pos.y);
+         p.text("Fusion: " + this.coreFusion.join("→"), this.pos.x + 10, this.pos.y + 12);
+       }
+     }
+
+
+     isDead() {
+       return this.lifespan <= 0;
+     }
+
+
+     explode() {
+       // Supernova or planetary nebula depending on mass
+       if (this.mass > 4 && STRONG_FORCE > 0.5) {
+         // Supernova - creates heavy elements
+         for (let i = 0; i < 20; i++) {
+           let newParticle = new Particle(
+             this.pos.x + p.random(-this.size, this.size),
+             this.pos.y + p.random(-this.size, this.size)
+           );
+
+
+           // Higher mass stars create heavier elements
+           if (p.random() < 0.3) {
+             newParticle.type = "iron";
+           } else if (p.random() < 0.6) {
+             newParticle.type = "carbon";
+           } else {
+             newParticle.type = p.random() < 0.7 ? "hydrogen" : "helium";
+           }
+
+
+           // Occasionally create uranium in massive star explosions
+           if (this.mass > 6 && p.random() < 0.05) {
+             newParticle.type = "uranium";
+           }
+
+
+           newParticle.applyElementProperties();
+           particles.push(newParticle);
+           totalMass += newParticle.mass;
+         }
+
+
+         // Add radiation burst
+         for (let i = 0; i < 30; i++) {
+           let rad = new Radiation(this.pos.x, this.pos.y);
+           rad.vel = p5.Vector.random2D().mult(SPEED_OF_LIGHT);
+           rad.lifespan = 100;
+           radiation.push(rad);
+         }
+       }
+       else {
+         // Planetary nebula - gentler ejection of outer layers
+         for (let i = 0; i < 10; i++) {
+           let newParticle = new Particle(
+             this.pos.x + p.random(-this.size, this.size),
+             this.pos.y + p.random(-this.size, this.size)
+           );
+           newParticle.type = p.random() < 0.8 ? "hydrogen" : "helium";
+           newParticle.applyElementProperties();
+           particles.push(newParticle);
+           totalMass += newParticle.mass;
+         }
+       }
+     }
+   }
+
+
+   class DisintegrationParticle extends Particle {
+     constructor(x, y) {
+       super(x, y);
+       this.lifespan = p.random(20, 50);
+       this.vel = p5.Vector.random2D().mult(p.random(1, 3));
+       this.color = p.color(255, 100, 100);
+       this.mass = 0.1;
+       this.size = 2;
+     }
+
+
+     update() {
+       this.pos.add(this.vel);
+       this.lifespan--;
+       this.color = p.color(255, 100, 100, this.lifespan * 5);
+     }
+   }
+
+
+   p.setup = function() {
+     const canvas = p.createCanvas(700, 500);
+     canvas.parent('canvas-container');
+
+
+     // Initial particles - amount depends on G (more gravity = denser universe)
+     let initialParticles = 50 + Math.floor(G_VALUE * 20);
+
+
+     for (let i = 0; i < initialParticles; i++) {
+       particles.push(new Particle(
+         p.width/2 + p.random(-universeRadius/2, universeRadius/2),
+         p.height/2 + p.random(-universeRadius/2, universeRadius/2)
+       ));
+     }
+
+
+     // Calculate initial total mass
+     totalMass = 0;
+     for (let particle of particles) {
+       totalMass += particle.mass;
+     }
+   };
+
+
+     p.draw = function() {
+         p.background(0);
+
+
+         // Update universe age
+         universeAge++;
+
+
+         // Update universe expansion
+         updateUniverseExpansion();
+
+
+         // Draw universe boundary
+         p.stroke(50, 50, 150, 80);
+         p.strokeWeight(1);
+         p.noFill();
+         p.ellipse(p.width / 2, p.height / 2, universeRadius * 2, universeRadius * 2);
+
+
+         // Update universe state based on age
+         updateUniverseState();
+
+
+         // Draw stars
+         for (let i = stars.length - 1; i >= 0; i--) {
+           stars[i].update();
+           stars[i].draw();
+
+
+           if (stars[i].isDead()) {
+             stars[i].explode();
+             stars.splice(i, 1);
+             starCount--;
+           }
+         }
+
+
+         // Draw particles
+         for (let i = particles.length - 1; i >= 0; i--) {
+           let particle = particles[i];
+
+
+           // Gravitational interactions
+           for (let j = 0; j < particles.length; j++) {
+             if (i !== j) {
+               let force = particle.gravitationalAttraction(particles[j]);
+               particle.applyForce(force);
+
+
+               // Electrostatic interactions - simplified model
+               if (ALPHA_VALUE > 0.1) {
+                 let eForce = particle.electrostaticForce(particles[j]);
+                 particle.applyForce(eForce);
+               }
+             }
+           }
+
+
+           // Star gravity - stronger than normal particles
+           for (let star of stars) {
+             let direction = p5.Vector.sub(star.pos, particle.pos);
+             let distance = direction.mag();
+
+
+             if (distance > 0 && distance < 100) {
+               direction.normalize();
+               let strength = (G_VALUE * star.mass * particle.mass * 2) / (distance * distance);
+               direction.mult(strength);
+               particle.applyForce(direction);
+             }
+           }
+
+
+           // Cosmological constant effect
+           if (LAMBDA_VALUE > 0.1) {
+             let expansionForce = particle.expansionForce();
+             particle.applyForce(expansionForce);
+           }
+
+
+           particle.update();
+           particle.draw();
+
+
+           if (particle.isDead()) {
+             totalMass -= particle.mass;
+             particles.splice(i, 1);
+           }
+         }
+
+
+         // Update radiation particles
+         for (let i = radiation.length - 1; i >= 0; i--) {
+           radiation[i].update();
+           radiation[i].draw();
+
+
+           if (radiation[i].isDead()) {
+             radiation.splice(i, 1);
+           }
+         }
+
+
+         // Add new particles occasionally
+         if (particles.length < 200 && p.random() < 0.05) {
+           let newParticle = new Particle();
+           particles.push(newParticle);
+           totalMass += newParticle.mass;
+         }
+
+
+         // Check for galaxy formation
+         checkGalaxyFormation();
+
+
+         // Check for primordial nucleosynthesis
+         checkNucleosynthesis();
+
+
+         // Update display
+         updateDisplay();
+       };
+
+
+       function updateUniverseState() {
+         if (universeAge < 30) {
+           universeState = "Big Bang";
+         } else if (universeAge < 80) {
+           universeState = "Inflation Era";
+         } else if (universeAge < 150) {
+           universeState = "Primordial Era";
+         } else if (stars.length > 0) {
+           universeState = "Stellar Era";
+
+
+           let carbonCount = 0;
+           let waterPotential = false;
+
+
+           for (let particle of particles) {
+             if (particle.type === "carbon" && particle.bonds.length > 0) {
+               carbonCount++;
+             }
+
+
+             if (
+               particle.type === "carbon" &&
+               particle.bonds.some(b => b.type === "hydrogen") &&
+               universeTemperature < 1000 &&
+               ALPHA_VALUE > 0.7 &&
+               ALPHA_VALUE < 1.3
+             ) {
+               waterPotential = true;
+             }
+           }
+
+
+           if (waterPotential && carbonCount > 5) {
+             universeState = "Life Potential Era";
+           }
+         } else if (particles.length > 20) {
+           universeState = "Degenerate Era";
+         } else {
+           universeState = "Heat Death";
+         }
+       }
+
+
+       function checkGalaxyFormation() {
+         if (!galaxyFormed && stars.length >= 5 && G_VALUE > 0.5) {
+           galaxyFormed = true;
+         }
+       }
+
+
+       function checkNucleosynthesis() {
+         if (
+           !nucleosynthesisOccurred &&
+           universeAge > 50 &&
+           universeAge < 100 &&
+           universeTemperature > 1000 &&
+           STRONG_FORCE > 0.5
+         ) {
+           nucleosynthesisOccurred = true;
+
+
+           for (let i = 0; i < 10; i++) {
+             let pos = p5.Vector.random2D().mult(universeRadius * 0.5);
+             pos.add(p.width / 2, p.height / 2);
+
+
+             let newParticle = new Particle(pos.x, pos.y);
+             newParticle.type = "helium";
+             newParticle.applyElementProperties();
+             particles.push(newParticle);
+             totalMass += newParticle.mass;
+           }
+         }
+       }
+
+
+       function updateDisplay() {
+           let controls = document.getElementById('controls-overlay');
+           controls.innerHTML = `
+           <div style="font-size: 12px; margin-bottom: 8px;">
+             <strong>Universe Age:</strong> ${universeAge.toFixed(0)} Myr<br>
+             <strong>State:</strong> ${universeState}<br>
+             <strong>Particles:</strong> ${particles.length}<br>
+             <strong>Stars:</strong> ${stars.length}<br>
+             <strong>Temperature:</strong> ${universeTemperature.toFixed(0)} K<br>
+             <strong>Universe Size:</strong> ${universeRadius.toFixed(1)}<br>
+             <strong>Expansion Rate:</strong> ${(universeExpansionRate * 100).toFixed(2)}%
+           </div>
+         `;
+
+
+           let explanation = document.getElementById('explanation-overlay');
+           let content = `<div style="font-size: 12px;">`;
+
+
+           if (universeAge < 30) {
+               content += `<strong>Big Bang:</strong> Initial singularity expanding rapidly.`;
+           } else if (universeState === "Inflation Era") {
+               content += `<strong>Inflation:</strong> Rapid expansion with G=${G_VALUE.toFixed(2)} and λ=${LAMBDA_VALUE.toFixed(2)}.`;
+           } else if (universeState === "Primordial Era") {
+               content += `<strong>Nucleosynthesis:</strong> Strong Force=${STRONG_FORCE.toFixed(2)} determining element formation.`;
+           } else if (universeState === "Stellar Era") {
+               content += `<strong>Star Formation:</strong> G=${G_VALUE.toFixed(2)} enables stellar fusion. α=${ALPHA_VALUE.toFixed(2)} controls atomic stability.`;
+           } else if (universeState === "Life Potential Era") {
+               content += `<strong>Organic Chemistry:</strong> Carbon compounds forming with ideal electromagnetic force α=${ALPHA_VALUE.toFixed(2)}.`;
+           } else if (universeState === "Degenerate Era") {
+               content += `<strong>Star Death:</strong> Universe cooling as expansion continues with λ=${LAMBDA_VALUE.toFixed(2)}.`;
+           } else {
+               content += `<strong>Heat Death:</strong> Energy dispersal approaching maximum entropy.`;
+           }
+
+
+           const density = calculateDensity();
+           const critical = isCriticalDensity();
+
+
+           content += `<br><br>Density: ${density.toFixed(4)} (${critical ? "Critical" : "Non-Critical"})</div>`;
+           explanation.innerHTML = content;
+       }})
+</script>
+
+
+
