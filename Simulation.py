@@ -368,20 +368,6 @@ html_string = html_template.replace("{G}", str(G)) \
 st.components.v1.html(html_string, height=550, scrolling=False)
 
 
-st.title("☀️ Sun Simulator ")
-
-# Use relative path based on the current script location
-current_dir = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(current_dir, "universe_sim3.html")
-
-# Display the html document
-with open(file_path, "r", encoding="utf-8") as f:
-    html_template = f.read()
-html_string = html_template.replace("{G}", str(G)) \
-                          .replace("{alpha}", str(alpha)) \
-                          .replace("{strong_force}", str(strong_force)) \
-                          .replace("{lambda_const}", str(lambda_const))
-st.components.v1.html(html_string, height=550, scrolling=False)
 
 # Add explanation for simulation
 st.markdown("""
@@ -411,5 +397,51 @@ This simulation shows how the fundamental constants affect the formation and beh
 
 # Footer for entire app
 st.markdown("---")
+
+# Sun simulator
+st.title("☀️ Sun Simulator")
+
+# Use relative path based on the current script location
+current_dir = os.path.dirname(os.path.abspath(__file__))
+file_path = os.path.join(current_dir, "universe_sim3.html")
+
+# Display the html document
+with open(file_path, "r", encoding="utf-8") as f:
+    html_template = f.read()
+html_string = html_template.replace("{G}", str(G)) \
+                          .replace("{alpha}", str(alpha)) \
+                          .replace("{strong_force}", str(strong_force)) \
+                          .replace("{lambda_const}", str(lambda_const))
+st.components.v1.html(html_string, height=550, scrolling=False)
+
+st.markdown("""
+### Star Lifecycle Simulation Features
+- **Main Sequence Stars**: Hydrogen-burning stars of varying masses and temperatures
+- **Red Giants**: Stars in later life stages with expanded outer layers
+- **Supernovas**: End-of-life explosions for massive stars
+- **Black Holes**: Form when very massive stars collapse under extreme gravity
+- **Neutron Stars**: Ultra-dense remnants of certain star types
+- **White Dwarfs**: Cooling remnants of less massive stars
+
+### Color Coding by Particle Type
+- 💧 **Hydrogen Particles**: Light blue (emitted during main sequence)
+- 🎈 **Helium Particles**: Yellow-white (emitted during red giant phase)
+- ☄️ **Black Hole Jets**: Purple (high-energy particles ejected from poles)
+- 🌟 **Photons**: Colored according to star temperature
+- ⚫ **Black Holes**: Black center with colored accretion disk
+- 🟣 **Accretion Disk**: Multi-colored ring of matter orbiting black holes
+
+### What's Happening
+This simulation shows how stars evolve over their lifecycle based on mass and fundamental constants. Try these combinations:
+- **Sun-like Star**: Mass ≈ 1.0, Temperature ≈ 5778K
+- **Red Giant Phase**: Increase simulation speed to watch evolution
+- **Black Hole Formation**: Set Mass > 25 and watch evolution to completion
+- **Physics Effects**: Adjust constants to see how they affect star behavior:
+  - **G (Gravity)**: Controls gravitational attraction and black hole properties
+  - **EM Force**: Affects photon emission and particle behavior
+  - **Strong Force**: Influences fusion processes and stellar evolution
+  - **λ (Cosmological Constant)**: Changes background space expansion
+""")
+
 st.info(
-    "This interactive simulation loosely demonstrates how finely tuned our universe must be to support life. Even small changes to fundamental constants can create universes where stars can't form, atoms are unstable, or expansion happens too rapidly for complex structures to emerge.")
+    "These interactive simulations loosely demonstrates how finely tuned our universe must be to support life. Even small changes to fundamental constants can create universes where stars can't form, atoms are unstable, or expansion happens too rapidly for complex structures to emerge.")
