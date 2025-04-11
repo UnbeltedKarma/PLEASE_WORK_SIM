@@ -414,6 +414,7 @@ html_string = html_template.replace("{G}", str(G)) \
                           .replace("{lambda_const}", str(lambda_const))
 st.components.v1.html(html_string, height=550, scrolling=False)
 
+
 st.markdown("""
 ### Star Lifecycle Simulation Features
 - **Main Sequence Stars**: Hydrogen-burning stars of varying masses and temperatures
@@ -442,6 +443,42 @@ This simulation shows how stars evolve over their lifecycle based on mass and fu
   - **Strong Force**: Influences fusion processes and stellar evolution
   - **λ (Cosmological Constant)**: Changes background space expansion
 """)
+
+st.title("🌌 Gravitational Well & Planetary Orbit Simulation")
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+file_path = os.path.join(current_dir, "universe_sim4.html")
+
+# Display the html document
+with open(file_path, "r", encoding="utf-8") as f:
+    html_template = f.read()
+html_string = html_template.replace("{G}", str(G)) \
+                          .replace("{alpha}", str(alpha)) \
+                          .replace("{strong_force}", str(strong_force)) \
+                          .replace("{lambda_const}", str(lambda_const))
+st.components.v1.html(html_string, height = 900 ,scrolling=False)
+
+st.markdown("""
+### 🧠 What You're Seeing
+
+- **Left Panel (Gravity Well)**: The "dip" in the grid represents how mass curves space. The more massive the object or the larger the **G**, the deeper and wider the well. This is a 2D slice of general relativity's concept of spacetime curvature.
+
+- **Right Panel (Planetary Orbits)**: Planets orbit based on Newtonian gravity. Their velocity and distance must be finely balanced to avoid spiraling into the sun or flinging into space. 
+
+- **Sliders**:
+  - Adjust **G** to see both the curvature of the well and the strength of gravitational pull change live.
+  - Modify **Time Speed** to speed up or slow down the evolution of planetary motion.
+
+### 🔍 Why It Matters
+
+- If **G** is too weak, orbits become unstable or escape entirely — no star systems.
+- If **G** is too strong, planets spiral inward rapidly — instability and destruction.
+- Only a very narrow range allows for **stable, life-supporting orbits** — a striking example of cosmological fine-tuning.
+
+This dual-simulation visually reinforces how **gravitational precision** is necessary for stable planetary systems, making it a powerful apologetics argument for fine-tuning.
+""")
+
+
 
 st.info(
     "These interactive simulations loosely demonstrates how finely tuned our universe must be to support life. Even small changes to fundamental constants can create universes where stars can't form, atoms are unstable, or expansion happens too rapidly for complex structures to emerge.")

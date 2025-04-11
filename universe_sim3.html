@@ -746,6 +746,19 @@
         p.fill(255);
         p.textSize(14);
         p.text(starState, star.x, star.y - star.radius - 20);
+
+        if (starState == "Main Sequence") {
+          let glow = STRONG_FORCE * 5;
+          p.fill(60, 100, 100, 0.6);
+          p.ellipse(star.x, star.y, star.radius * glow * 0.01);
+        }
+
+        let lifePercent = starLifecycle / 100;
+        p.fill(255, 255, 255, 80);
+        p.rect(20, 480, 200, 6); // BG
+        p.fill(0, 255, 100);
+        p.rect(20, 480, 200 * lifePercent, 6);
+        p.text("Star Age", 120, 475);
       };
 
       function drawBackgroundStars() {

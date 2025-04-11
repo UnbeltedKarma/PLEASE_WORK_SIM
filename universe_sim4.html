@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Side View Gravity Well & Orbit Simulator</title>
+  <style>
+    body { margin: 0; background: #111; color: white; font-family: sans-serif; }
+    #controls { padding: 10px; background: #222; }
+    label { margin-right: 10px; }
+    #canvas-wrapper { display: block; text-align: center; margin-top: 10px; }
+    canvas { border: 1px solid #444; }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <label>Gravitational Constant (G):</label>
+    <input type="range" id="gravity-slider" min="0.1" max="5" step="0.1" value="1">
+    <span id="gravity-value">1.0</span>
+
+    <label style="margin-left:20px;">Time Speed:</label>
+    <input type="range" id="speed-slider" min="0.1" max="5" step="0.1" value="1">
+    <span id="speed-value">1.0</span>
+
+    <button id="reset-btn" style="margin-left:20px;">Reset Simulation</button>
+  </div>
+
+  <div id="canvas-wrapper">
+    <div id="well-canvas"></div>
+    <div id="orbit-canvas"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+  <script>
+    let G = 1.0;
+    let timeSpeed = 0.5;
+
+    // === Side View Gravitational Well ===
+    new p5(p => {
+      const w = 400, h = 400;
+      const mass = 80;
+
+      p.setup = function() {
+        const canvas = p.createCanvas(w, h);
+        canvas.parent('well-canvas');
+      };
+
+      p.draw = function() {
+        p.background(0);
+        p.stroke(255);
+        p.noFill();
+        p.beginShape();
+        for (let x = 0; x < p.width; x++) {
+          let dx = x - p.width / 2;
+          let y = G * mass / (Math.sqrt(dx * dx + 50)) * 20 + p.height / 2;
+          p.vertex(x, y);
+        }
+        p.endShape();
+
+        // Draw mass at center
+        p.fill(255, 255, 0);
+        p.noStroke();
+        p.ellipse(p.width / 2, p.height / 2, 10, 10);
+      };
+    });
+
+    // === Orbit Simulation ===
+    new p5(p => {
+      let planets = [];
+      const initialConfigs = [
+        { dist: 60, size: 4, speed: 2.3, color: 'skyblue' },
+        { dist: 100, size: 6, speed: 1.6, color: 'lime' },
+        { dist: 140, size: 7, speed: 1.3, color: 'orange' },
+        { dist: 180, size: 5, speed: 1.0, color: 'violet' }
+      ];
+      const width = 400, height = 400;
+      const sun = { x: width / 2, y: height / 2, mass: 1000 };
+
+      class Planet {
+        constructor(dist, size, speed, color) {
+          this.pos = p.createVector(sun.x + dist, sun.y);
+          this.vel = p.createVector(0, -speed);
+          this.acc = p.createVector(0, 0);
+          this.mass = size * 5;
+          this.size = size;
+          this.color = color;
+        }
+
+        applyGravity() {
+          let force = p5.Vector.sub(p.createVector(sun.x, sun.y), this.pos);
+          let distanceSq = p.constrain(force.magSq(), 100, 10000);
+          let strength = G * this.mass * sun.mass / distanceSq;
+          force.setMag(strength / this.mass);
+          this.acc = force;
+        }
+
+        update() {
+          this.applyGravity();
+          this.vel.add(p5.Vector.mult(this.acc, timeSpeed));
+          this.pos.add(p5.Vector.mult(this.vel, timeSpeed));
+        }
+
+        draw() {
+          p.fill(this.color);
+          p.noStroke();
+          p.ellipse(this.pos.x, this.pos.y, this.size * 2);
+        }
+      }
+
+      function resetSimulation() {
+        planets = [];
+        for (let cfg of initialConfigs) {
+          planets.push(new Planet(cfg.dist, cfg.size, cfg.speed, cfg.color));
+        }
+      }
+
+      p.setup = function() {
+        const canvas = p.createCanvas(width, height);
+        canvas.parent('orbit-canvas');
+        resetSimulation();
+      };
+
+      p.draw = function() {
+        p.background(0);
+        p.fill(255, 204, 0);
+        p.noStroke();
+        p.ellipse(sun.x, sun.y, 20, 20);
+
+        for (let planet of planets) {
+          planet.update();
+          planet.draw();
+        }
+      };
+
+      document.getElementById("reset-btn").onclick = resetSimulation;
+    });
+
+    // === UI Bindings ===
+    document.getElementById("gravity-slider").oninput = function() {
+      G = parseFloat(this.value);
+      document.getElementById("gravity-value").innerText = G.toFixed(1);
+    };
+
+    document.getElementById("speed-slider").oninput = function() {
+      timeSpeed = parseFloat(this.value);
+      document.getElementById("speed-value").innerText = timeSpeed.toFixed(1);
+    };
+  </script>
+</body>
+</html>

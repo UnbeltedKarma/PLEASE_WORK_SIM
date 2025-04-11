@@ -7,6 +7,9 @@
 </div>
 
 
+<button id="toggle-btn" style="position: absolute; top: 10px; left: 220px; z-index: 10;">⏯️ Pause</button>
+
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
 <script>
  new p5(function(p) {
@@ -16,6 +19,12 @@
    let universeState = "Forming";
    let starCount = 0;
    let galaxyFormed = false;
+
+    let paused = false;
+        document.getElementById("toggle-btn").addEventListener("click", () => {
+          paused = !paused;
+          document.getElementById("toggle-btn").innerText = paused ? "▶️ Resume" : "⏸️ Pause";
+        });
 
 
    // Constants from sliders
@@ -38,6 +47,19 @@
            this.stable = true;
            this.energy = p.random(0, 10);
            this.applyElementProperties();
+         }
+
+         applyEMRepulsion(other) {
+          if (this == other || this.type !== other.tpye) return;
+
+          let force = p5.Vector.sub(this.pos, other.pos);
+          let distance = force.mag();
+          if (distance < 10) return;
+
+          force.normalize();
+          let strength = ALPHA_VALUE * .5 / distance;
+          force.mult(strength);
+          this.applyForce(force)
          }
 
          determineElementType() {
@@ -172,6 +194,11 @@
            if (this.pos.x > p.width) this.pos.x = 0;
            if (this.pos.y < 0) this.pos.y = p.height;
            if (this.pos.y > p.height) this.pos.y = 0;
+
+           // Add rare tenneling-based fusion chance
+           if (this.type == "hydrogen" && p.random(1) < 0.0001 * Math.sqrt(ALPHA_VALUE * G_VALUE)) {
+            this.formStar();
+           }
          }
 
          attemptBonding() {
@@ -525,7 +552,7 @@
          let content = `<strong>Universe Age:</strong> ${Math.floor(universeAge)}<br>`;
          content += `<strong>Stars:</strong> ${stars.length}<br>`;
          content += `<strong>Elements:</strong><br>`;
-         content += `H: ${{hydrogenCount}} | He: ${heliumCount} | C: ${carbonCount} | Fe: ${ironCount}<br>`;
+         content += `H: ${hydrogenCount} | He: ${heliumCount} | C: ${carbonCount} | Fe: ${ironCount}<br>`;
          content += `<strong>Constants:</strong><br>`;
          content += `G: ${G_VALUE.toFixed(1)} | α: ${ALPHA_VALUE.toFixed(2)} | Strong: ${STRONG_FORCE.toFixed(1)} | Λ: ${LAMBDA_VALUE.toFixed(2)}`;
 
@@ -556,11 +583,20 @@
                  carbonMolecules >= 1);
        }
 
+   let starfield = [];
 
    p.setup = function() {
      let canvas = p.createCanvas(700, 500);
      canvas.parent('canvas-container');
 
+     for (let i = 0; i < 200; i++) {
+      starfield.push({
+        x: p.random(p.width),
+        y: p.random(p.height),
+        alpha: p.random(50, 150),
+        size: p.random(1, 3)
+      });
+     }
 
      // Initialize particles
      for (let i = 0; i < 150; i++) {
@@ -580,9 +616,17 @@
 
 
    p.draw = function() {
+     // Pause function
+     if (paused) return;
+
      // Space background with subtle nebula effect
      p.background(10, 10, 30);
 
+     for (let s of starfield) {
+      p.noStroke();
+      p.fill(255, s.alpha);
+      p.ellipse(s.x, s.y, s.size, s.size);
+     }
 
      // Draw distant stars (background)
      for (let i = 0; i < 100; i++) {
@@ -682,6 +726,19 @@
      // Update UI elements
      updateControls();
      updateExplanation();
+
+    for (let i = 0; i < particles.length; i++) {
+     for (let j = i + 1; j < particles.length; j++) {
+      particles[i].applyEMRepulsion(particles[j]);
+     }
+    }
+
+    // Draw a lifecycle bar for stars
+   p.fill(200);
+   p.rect(20, 470, 200, 8); // Background
+   p.fill(0, 255, 100);
+   p.rect(20, 470, p.map(universeAge, 0, 2000, 0, 200), 8); // Age progress
+   p.text("Universe Age", 125, 460);
    };
  }, 'universe-sim');
 </script>
