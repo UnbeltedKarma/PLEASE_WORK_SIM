@@ -319,38 +319,6 @@ else:
 # Combine explanations
 st.markdown(" ".join(explanation))
 
-# Section 4:
-st.subheader("📈 Life Potential Across G and Λ")
-
-G_vals = np.linspace(0.1, 10, 50)
-L_vals = np.linspace(0.01, 2.0, 50)
-Z = []
-
-for g in G_vals:
-    row = []
-    for lam in L_vals:
-        star = 1.0 / (g * strong_force)
-        cosmos = g / (lam + 0.1)
-        atom = alpha / (strong_force + 0.1)
-        life = (star * atom * cosmos) ** (1 / 3)
-        row.append(life)
-    Z.append(row)
-
-fig = go.Figure(data=go.Heatmap(
-    z=Z,
-    x=L_vals,
-    y=G_vals,
-    colorscale="Viridis",
-    colorbar=dict(title="Life Score")
-))
-fig.update_layout(
-    xaxis_title="Cosmological Constant (Λ)",
-    yaxis_title="Gravitational Constant (G)",
-    title="Life Potential as G and Λ Vary",
-    height=500
-)
-st.plotly_chart(fig, use_container_width=True)
-
 # Universe Simulation Section
 st.title("⚛️ Interactive Universe Simulation")
 
